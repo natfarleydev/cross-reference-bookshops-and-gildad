@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} &middot; Origami Book Finder{% endblock %}
+
+{% block content %}
+<article class="book-detail">
+  <div class="detail-head">
+    {% if book.cover_url %}
+      <img class="detail-cover" src="{{ book.cover_url }}" alt="Cover of {{ book.title }}">
+    {% endif %}
+    <div class="detail-meta">
+      <h1>{{ book.title }}</h1>
+      {% if book.author %}<p class="detail-author">by {{ book.author }}</p>{% endif %}
+
+      <p class="badges">
+        <span class="badge skill-{{ (book.difficulty.buckets|list|first) if book.difficulty.buckets else 'unknown' }}">
+          Skill: {{ book.difficulty.label }}
+        </span>
+        <span class="badge count">{{ book.design_count }} diagrams</span>
+      </p>
+
+      <div class="buy-panel">
+        {% if listing %}
+          <a class="buy big" href="{{ listing.url }}" target="_blank" rel="noopener">
+            Buy on Bookshop.org{% if listing.price is not none %} &middot; {{ listing|price }}{% endif %}
+          </a>
+          <span class="stock {{ 'ok' if listing.in_stock else 'no' }}">
+            {{ 'In stock' if listing.in_stock else listing.availability or 'availability unknown' }}
+          </span>
+          {% if listing.publisher %}<p class="pub">{{ listing.publisher }}</p>{% endif %}
+        {% else %}
+          <p class="bookshop out">Not found on Bookshop.org{% if not book.isbn13 %} (no ISBN on record){% endif %}</p>
+        {% endif %}
+        {% if book.url %}
+          <p><a href="{{ book.url }}" target="_blank" rel="noopener">View on Gilad&rsquo;s database &rarr;</a></p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if book.technical %}
+  <section class="technical">
+    <h2>Details</h2>
+    <dl class="tech-grid">
+      {% for key, value in book.technical.items() %}
+        {% if value %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endif %}
+      {% endfor %}
+    </dl>
+  </section>
+  {% endif %}
+
+  <section class="diagrams">
+    <h2>Diagrams in this book ({{ book.design_count }})</h2>
+    {% if book.designs %}
+    <table class="diagram-table">
+      <thead>
+        <tr><th>Design</th><th>Designer</th><th>Subject</th><th>Page</th><th>Paper</th></tr>
+      </thead>
+      <tbody>
+        {% for d in book.designs %}
+        <tr>
+          <td>{{ d.name }}{% if d.has_crease_pattern %} <span class="cp">CP</span>{% endif %}</td>
+          <td>{{ d.designer }}</td>
+          <td class="subject">{{ d.subject }}</td>
+          <td class="num">{{ d.page }}</td>
+          <td>{{ d.paper }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No diagram list recorded for this book.</p>
+    {% endif %}
+  </section>
+</article>
+{% endblock %}

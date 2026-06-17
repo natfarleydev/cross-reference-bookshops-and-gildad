@@ -31,7 +31,7 @@ USER_AGENT = os.environ.get(
 
 # Seconds to wait between *live* (cache-miss) requests to the same host, so we
 # stay a polite scraper. Cache hits are never delayed.
-REQUEST_DELAY_SECONDS = float(os.environ.get("ORIGAMI_REQUEST_DELAY", "1.0"))
+REQUEST_DELAY_SECONDS = float(os.environ.get("ORIGAMI_REQUEST_DELAY", "0.5"))
 
 # Per-request network timeout.
 REQUEST_TIMEOUT_SECONDS = float(os.environ.get("ORIGAMI_REQUEST_TIMEOUT", "20"))
