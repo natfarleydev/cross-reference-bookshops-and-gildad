@@ -150,8 +150,13 @@ def _matches(book: CatalogBook, f: BrowseFilters) -> bool:
         return False
     if f.hide_kids and book.is_kids:
         return False
-    if f.levels and not any(book.difficulty.matches_bucket(b) for b in f.levels):
-        return False
+    if f.levels:
+        # An explicit skill filter excludes books whose level is unknown (e.g.
+        # paper packs Gilad doesn't rate) — only show confirmed matches.
+        if not book.difficulty.is_known:
+            return False
+        if not any(book.difficulty.matches_bucket(b) for b in f.levels):
+            return False
     return True
 
 

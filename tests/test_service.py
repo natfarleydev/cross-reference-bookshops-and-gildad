@@ -53,6 +53,16 @@ def test_browse_level_filter():
     assert {b.isbn13 for b in res.items} == {"1", "3"}
 
 
+def test_browse_level_filter_excludes_unknown():
+    # A paper pack with no Gilad rating must NOT appear under an explicit level
+    # filter, but should appear when no level is selected.
+    cat = Catalog(":memory:")
+    cat.upsert(CatalogBook(isbn13="9", title="333 Origami Sheets", status="in stock",
+                           format_category="Stationery"))  # unknown difficulty
+    assert service.browse(cat, BrowseFilters(levels={skill.BUCKET_INTERMEDIATE})).total == 0
+    assert service.browse(cat, BrowseFilters()).total == 1
+
+
 def test_browse_author_filter():
     res = service.browse(_catalog(), BrowseFilters(author="Marc K"))
     assert {b.isbn13 for b in res.items} == {"1", "3"}
