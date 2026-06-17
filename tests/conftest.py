@@ -1,4 +1,4 @@
-"""Shared test helpers."""
+"""Shared test helpers and fixtures."""
 
 from __future__ import annotations
 
@@ -11,11 +11,6 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 def load_fixture(name: str) -> str:
     return (FIXTURES / name).read_text(encoding="utf-8", errors="replace")
-
-
-@pytest.fixture
-def fixtures_dir() -> Path:
-    return FIXTURES
 
 
 @pytest.fixture
@@ -34,5 +29,5 @@ def gilad_convention_html() -> str:
 
 
 @pytest.fixture
-def bookshop_html() -> str:
-    return load_fixture("bookshop_9780804853101.html")
+def bookshop_meili_json() -> str:
+    return load_fixture("bookshop_meili_origami.json")

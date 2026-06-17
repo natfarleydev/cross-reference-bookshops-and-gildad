@@ -12,6 +12,8 @@ The client is deliberately tiny and dependency-light: ``requests`` for fetching,
 
 from __future__ import annotations
 
+import hashlib
+import json
 import sqlite3
 import threading
 import time
@@ -144,16 +146,43 @@ class HttpClient:
         self._last_request_at = time.time()
 
     def get(self, url: str, *, force_refresh: bool = False) -> CachedResponse:
-        """Return the (possibly cached) response for ``url``.
+        """Return the (possibly cached) response for a GET ``url``."""
+        return self._cached(
+            url,
+            lambda: self._session.get(url, timeout=self.timeout, allow_redirects=True),
+            force_refresh=force_refresh,
+        )
 
-        - Fresh cache hit -> returned immediately, ``from_cache=True``.
+    def post_json(self, url: str, payload: dict, *, force_refresh: bool = False) -> CachedResponse:
+        """POST ``payload`` as JSON and cache the response.
+
+        The cache key folds in a stable hash of the body so different payloads to
+        the same endpoint (e.g. different search pages) are cached separately.
+        """
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+        cache_key = f"POST {url}#{digest}"
+        return self._cached(
+            cache_key,
+            lambda: self._session.post(
+                url,
+                data=body,
+                headers={"Content-Type": "application/json"},
+                timeout=self.timeout,
+            ),
+            force_refresh=force_refresh,
+        )
+
+    def _cached(self, cache_key, do_fetch, *, force_refresh: bool) -> CachedResponse:
+        """Shared cache-first logic for any request.
+
+        - Fresh hit -> returned immediately, ``from_cache=True``.
         - Stale/missing -> fetched live (subject to the politeness delay), stored,
           and returned. In offline mode a stale entry is still served and a true
           miss raises :class:`CacheMiss`.
         """
         with self._lock:
-            row = self._read(url)
-
+            row = self._read(cache_key)
             if row is not None and not force_refresh:
                 if self._is_fresh(row["fetched_at"]) or self.offline:
                     return CachedResponse(
@@ -165,10 +194,10 @@ class HttpClient:
                     )
 
             if self.offline:
-                raise CacheMiss(f"offline and no cached copy of {url!r}")
+                raise CacheMiss(f"offline and no cached copy of {cache_key!r}")
 
             self._throttle()
-            http = self._session.get(url, timeout=self.timeout, allow_redirects=True)
+            http = do_fetch()
             resp = CachedResponse(
                 url=http.url,
                 status_code=http.status_code,
@@ -179,7 +208,7 @@ class HttpClient:
             # Cache successful and "not found" responses; both are stable answers.
             # Transient 5xx are not cached so a later retry can succeed.
             if http.status_code < 500:
-                self._write(url, resp)
+                self._write(cache_key, resp)
             return resp
 
     # --- introspection ----------------------------------------------------

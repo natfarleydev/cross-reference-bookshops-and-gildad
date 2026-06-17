@@ -31,6 +31,10 @@ class FakeSession:
             return FakeResponse(url, 200, f"live:{url}:{self.calls}")
         return resp
 
+    def post(self, url, data=None, headers=None, timeout=None):
+        self.calls += 1
+        return FakeResponse(url, 200, f"post:{url}:{data}:{self.calls}")
+
 
 def make_client(session=None, **kw):
     kw.setdefault("request_delay", 0)
@@ -106,6 +110,20 @@ def test_404_is_cached():
     client.get("http://x/missing")
     client.get("http://x/missing")
     assert session.calls == 1  # 404 is a stable answer, cached
+
+
+def test_post_json_cached_by_body():
+    session = FakeSession()
+    client = make_client(session)
+
+    r1 = client.post_json("http://x/search", {"q": "a"})
+    assert r1.from_cache is False and session.calls == 1
+    # Same payload -> cache hit.
+    r2 = client.post_json("http://x/search", {"q": "a"})
+    assert r2.from_cache is True and session.calls == 1
+    # Different payload -> separate cache entry, new call.
+    client.post_json("http://x/search", {"q": "b"})
+    assert session.calls == 2
 
 
 def test_stats():

@@ -2,8 +2,8 @@
 {% block title %}Not found &middot; Origami Book Finder{% endblock %}
 {% block content %}
 <section class="empty-state">
-  <h1>Book not found</h1>
-  <p>No book with id <code>{{ book_id }}</code> in Gilad&rsquo;s database (or it couldn&rsquo;t be fetched).</p>
-  <p><a href="{{ url_for('index') }}">&larr; Back to search</a></p>
+  <h1>Book not in the catalogue</h1>
+  <p>No origami book with ISBN <code>{{ isbn13 }}</code> is in the Bookshop catalogue.</p>
+  <p><a href="/">&larr; Back to browse</a></p>
 </section>
 {% endblock %}

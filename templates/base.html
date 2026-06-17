@@ -1,21 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Origami Book Finder{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="{{ url_for('index') }}">
-      <span class="brand-mark">&#9650;</span> Origami Book Finder
-    </a>
-    <form class="header-search" action="{{ url_for('search') }}" method="get">
-      <input type="search" name="q" placeholder="Fold a&hellip; dragon, rose, box&hellip;"
-             value="{{ query|default('', true) }}" autocomplete="off">
-      <button type="submit">Search</button>
+    <a class="brand" href="/"><span class="brand-mark">&#9650;</span> Origami Book Finder</a>
+    <form class="header-search" action="/" method="get">
+      <input type="search" name="q" placeholder="Filter by title, author&hellip;"
+             value="{{ filters.text if filters else '' }}" autocomplete="off">
+      <button type="submit">Filter</button>
     </form>
+    <span class="region-badge" title="Storefront / currency">
+      {{ settings.region.host }} &middot; {{ settings.currency }}
+    </span>
   </header>
 
   <main class="content">
@@ -24,18 +25,9 @@
 
   <footer class="site-footer">
     <span>
-      Data: <a href="https://www.giladorigami.com/" target="_blank" rel="noopener">Gilad&rsquo;s Origami Database</a>
-      &middot; <a href="https://bookshop.org/" target="_blank" rel="noopener">Bookshop.org</a>
+      Buy on <a href="{{ settings.region.base }}" target="_blank" rel="noopener">Bookshop.org</a>
+      &middot; skill &amp; diagrams from <a href="https://www.giladorigami.com/" target="_blank" rel="noopener">Gilad&rsquo;s Origami Database</a>
     </span>
-    {% if cache_stats %}
-    <span class="cache-info">
-      cache: {{ cache_stats.fresh }} fresh / {{ cache_stats.total }} pages
-      <form action="{{ url_for('cache_clear') }}" method="post" class="inline-form"
-            onsubmit="return confirm('Clear the cached pages? They will be re-fetched on demand.');">
-        <button type="submit" class="link-button">clear</button>
-      </form>
-    </span>
-    {% endif %}
   </footer>
 </body>
 </html>

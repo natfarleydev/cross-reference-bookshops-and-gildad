@@ -324,3 +324,18 @@ def get_book(url: str, client: HttpClient) -> GiladBook | None:
     if resp.status_code != 200:
         return None
     return parse_book(resp.text, url=resp.url or full)
+
+
+def find_book_by_isbn(isbn13: str, client: HttpClient) -> GiladBook | None:
+    """Find a Gilad book page from a Bookshop ISBN.
+
+    Gilad's free-text search accepts ISBN-10/13 and returns the matching book, so
+    we search for the ISBN, prefer a modern ``/origami-database-book/<id>`` hit
+    over a legacy review page, then fetch that page for skill level + diagrams.
+    """
+    hits = search(isbn13, client)
+    if not hits:
+        return None
+    # Prefer hits that point at a numbered database book page.
+    chosen = next((h for h in hits if h.book_id), hits[0])
+    return get_book(chosen.book_url, client)

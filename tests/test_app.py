@@ -1,58 +1,64 @@
-"""Flask route smoke tests with a fake-session client (no real network)."""
+"""FastAPI route tests using dependency_overrides (no real network)."""
 
 from __future__ import annotations
 
 import pytest
+from fastapi.testclient import TestClient
 
 import app as app_module
-from origami.cache import HttpClient
-from tests.test_crossref import FakeSession
+from origami.catalog import Catalog
+from origami.deps import get_catalog, get_client
+from origami.models import CatalogBook
+from origami.skill import INTERMEDIATE, Difficulty
+from tests.test_service import FakeClient
 
 
 @pytest.fixture
-def client(monkeypatch):
-    # Swap the app's shared HTTP client for one wired to fixtures.
-    fake = HttpClient(db_path=":memory:", session=FakeSession(), request_delay=0)
-    monkeypatch.setattr(app_module, "client", fake)
-    app_module.app.config.update(TESTING=True)
-    return app_module.app.test_client()
+def client():
+    cat = Catalog(":memory:")
+    cat.upsert_many([
+        CatalogBook(isbn13="9781111111111", title="Origami Dragons", author="Marc K",
+                    price=15.0, status="in stock", format_category="Paperback",
+                    design_count=10, difficulty=Difficulty(INTERMEDIATE, INTERMEDIATE, "Intermediate"),
+                    enriched=True),
+        CatalogBook(isbn13="9782222222222", title="Kusudama Magic", author="Tomoko F",
+                    price=9.0, status="backorder", format_category="Paperback", enriched=True),
+    ])
+    fake_client = FakeClient()
+    app_module.app.dependency_overrides[get_catalog] = lambda: cat
+    app_module.app.dependency_overrides[get_client] = lambda: fake_client
+    yield TestClient(app_module.app)
+    app_module.app.dependency_overrides.clear()
 
 
-def test_index_renders(client):
+def test_browse_renders(client):
     resp = client.get("/")
     assert resp.status_code == 200
-    assert b"Origami Book Finder" in resp.data
-    assert b"Popular" in resp.data
+    assert "Origami Dragons" in resp.text
+    assert "Kusudama Magic" in resp.text
+    assert "£15.00" in resp.text          # UK currency formatting
 
 
-def test_search_renders_results(client):
-    resp = client.get("/search?q=wyvern")
+def test_browse_text_filter(client):
+    resp = client.get("/?q=dragons")
+    assert "Origami Dragons" in resp.text
+    assert "Kusudama Magic" not in resp.text
+
+
+def test_browse_in_stock_filter(client):
+    resp = client.get("/?in_stock=true")
+    assert "Origami Dragons" in resp.text
+    assert "Kusudama Magic" not in resp.text
+
+
+def test_book_detail(client):
+    resp = client.get("/book/9781111111111")
     assert resp.status_code == 200
-    assert b"Origami Dragons" in resp.data
-    assert b"Bookshop.org" in resp.data
-    # Skill badge from the fetched book page.
-    assert b"Simple" in resp.data
-
-
-def test_search_empty_query_redirects(client):
-    resp = client.get("/search?q=")
-    assert resp.status_code == 302
-
-
-def test_search_with_level_filter(client):
-    resp = client.get("/search?q=wyvern&level=complex")
-    assert resp.status_code == 200
-    assert b"Origami Dragons" in resp.data
-
-
-def test_book_detail_renders(client):
-    resp = client.get("/book/3795")
-    assert resp.status_code == 200
-    assert b"Diagrams in this book" in resp.data
-    assert b"Dragon footprint" in resp.data
+    assert "Diagrams in this book" in resp.text
+    assert "Buy on Bookshop.org" in resp.text
 
 
 def test_book_not_found(client):
-    resp = client.get("/book/000000")
+    resp = client.get("/book/0000000000000")
     assert resp.status_code == 404
-    assert b"not found" in resp.data.lower()
+    assert "not in the catalogue" in resp.text.lower()

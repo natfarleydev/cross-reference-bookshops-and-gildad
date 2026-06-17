@@ -1,59 +1,86 @@
 """Central configuration.
 
 Everything tunable lives here so the rest of the package never hard-codes a URL,
-a timeout, or a cache policy. Values can be overridden with environment variables
-(prefixed ``ORIGAMI_``) which makes the app easy to configure without code edits.
+a timeout, or a cache policy. Values can be overridden with ``ORIGAMI_*``
+environment variables, which makes the app configurable without code edits.
+
+The app is **Bookshop.org-first**: Bookshop is the source of truth for *what you
+can buy*; Gilad's database only supplements each book with a skill level and the
+list of diagrams inside it. The default region is the UK.
 """
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 # --- Paths -----------------------------------------------------------------
 
-# Repo root (this file lives in <root>/origami/config.py).
 ROOT_DIR = Path(__file__).resolve().parent.parent
-
-# Where the SQLite HTTP cache lives. Kept out of version control (see .gitignore).
 DATA_DIR = Path(os.environ.get("ORIGAMI_DATA_DIR", ROOT_DIR / "data"))
 CACHE_DB_PATH = Path(os.environ.get("ORIGAMI_CACHE_DB", DATA_DIR / "http_cache.sqlite"))
+CATALOG_DB_PATH = Path(os.environ.get("ORIGAMI_CATALOG_DB", DATA_DIR / "catalog.sqlite"))
 
 
 # --- HTTP / scraping politeness -------------------------------------------
 
-# A real browser UA is required: both sites 403 the default crawler agents.
+# A real browser UA is required: both sites 403 default crawler agents.
 USER_AGENT = os.environ.get(
     "ORIGAMI_USER_AGENT",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36",
 )
-
-# Seconds to wait between *live* (cache-miss) requests to the same host, so we
-# stay a polite scraper. Cache hits are never delayed.
-REQUEST_DELAY_SECONDS = float(os.environ.get("ORIGAMI_REQUEST_DELAY", "0.5"))
-
-# Per-request network timeout.
+REQUEST_DELAY_SECONDS = float(os.environ.get("ORIGAMI_REQUEST_DELAY", "0.4"))
 REQUEST_TIMEOUT_SECONDS = float(os.environ.get("ORIGAMI_REQUEST_TIMEOUT", "20"))
 
-# How long a cached response stays fresh. Book metadata barely changes, so we
-# cache *very* aggressively by default (30 days). Prices change more often but
-# are not worth hammering the site for; the UI exposes a manual refresh.
+# Cache aggressively: book metadata barely changes (30 days default).
 CACHE_TTL_SECONDS = int(os.environ.get("ORIGAMI_CACHE_TTL", str(30 * 24 * 3600)))
-
-# When True, the HTTP client never hits the network and only serves cache hits
-# (raises on a miss). Useful for tests and offline browsing.
 OFFLINE = os.environ.get("ORIGAMI_OFFLINE", "").lower() in {"1", "true", "yes"}
 
 
-# --- Source URLs -----------------------------------------------------------
+# --- Region / Bookshop -----------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Region:
+    """A Bookshop.org storefront."""
+
+    code: str
+    host: str
+    currency: str
+
+    @property
+    def base(self) -> str:
+        return f"https://{self.host}"
+
+    @property
+    def multi_search_url(self) -> str:
+        # Bookshop's front end is an instant-meilisearch app; this proxy speaks
+        # the Meilisearch /multi-search protocol and needs no API key.
+        return f"{self.base}/api/next/instantsearch/multi-search"
+
+    def isbn_url(self, isbn13: str) -> str:
+        # Stable redirect to the product page (ISBN-13 only; ISBN-10 404s).
+        return f"{self.base}/book/{isbn13}"
+
+
+REGIONS = {
+    "uk": Region("uk", "uk.bookshop.org", "GBP"),
+    "us": Region("us", "bookshop.org", "USD"),
+}
+
+REGION = REGIONS[os.environ.get("ORIGAMI_REGION", "uk").lower()]
+
+# The Meilisearch index that holds sellable products.
+BOOKSHOP_INDEX = os.environ.get("ORIGAMI_BOOKSHOP_INDEX", "products")
+# The full-text query used to scope the catalogue to origami titles.
+CATALOG_QUERY = os.environ.get("ORIGAMI_CATALOG_QUERY", "origami")
+
+
+# --- Gilad -----------------------------------------------------------------
 
 GILAD_BASE = "https://www.giladorigami.com"
-# Free-form database search. Returns one row per (design, book) pairing.
-GILAD_SEARCH_URL = GILAD_BASE + "/origami-database/{query}"
-# Canonical book page, e.g. /origami-database-book/3795/Origami-Dragons-...
+# Free-form search; accepts ISBN-10/13 and returns the matching book.
+GILAD_SEARCH_URL = GILAD_BASE + "/database-redirect.php?dbq={query}"
 GILAD_BOOK_URL = GILAD_BASE + "/origami-database-book/{book_id}"
-
-BOOKSHOP_BASE = "https://bookshop.org"
-# Stable ISBN -> product-page redirect. Only ISBN-13 resolves (ISBN-10 404s).
-BOOKSHOP_ISBN_URL = BOOKSHOP_BASE + "/book/{isbn13}"

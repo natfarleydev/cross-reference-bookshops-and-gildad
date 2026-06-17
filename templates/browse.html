@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Browse origami books &middot; Bookshop.org{% endblock %}
+
+{% block content %}
+<div class="browse-layout">
+
+  <aside class="sidebar">
+    <form action="/" method="get" class="filter-form">
+      <input type="hidden" name="q" value="{{ filters.text }}">
+
+      <div class="filter-block">
+        <label class="filter-label" for="sort">Sort</label>
+        <select id="sort" name="sort" onchange="this.form.submit()">
+          {% for key, label in sorts.items() %}
+          <option value="{{ key }}" {{ 'selected' if filters.sort == key }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-block">
+        <span class="filter-label">Availability</span>
+        <label class="check"><input type="checkbox" name="in_stock" value="true" {{ 'checked' if filters.in_stock_only }}> In stock now</label>
+      </div>
+
+      <div class="filter-block">
+        <span class="filter-label">Skill level <small>(via Gilad)</small></span>
+        {% for f in result.levels %}
+        <label class="check">
+          <input type="checkbox" name="level" value="{{ f.value }}" {{ 'checked' if f.value in filters.levels }}>
+          {{ f.value|capitalize }} <span class="facet-count">{{ f.count }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="filter-block">
+        <span class="filter-label">Format</span>
+        {% for f in result.formats[:8] %}
+        <label class="check">
+          <input type="checkbox" name="format" value="{{ f.value }}" {{ 'checked' if f.value in filters.formats }}>
+          {{ f.value }} <span class="facet-count">{{ f.count }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="filter-block">
+        <span class="filter-label">Audience</span>
+        <label class="check"><input type="checkbox" name="hide_kids" value="true" {{ 'checked' if filters.hide_kids }}> Hide kids&rsquo; books</label>
+      </div>
+
+      <div class="filter-block">
+        <label class="filter-label" for="author">Author</label>
+        <select id="author" name="author" onchange="this.form.submit()">
+          <option value="">All authors</option>
+          {% for f in result.authors %}
+          <option value="{{ f.value }}" {{ 'selected' if filters.author == f.value }}>{{ f.value }} ({{ f.count }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="apply">Apply filters</button>
+      <a class="reset" href="/">Reset</a>
+    </form>
+
+    <p class="catalog-status">
+      {{ result.catalog_size }} origami books on Bookshop.<br>
+      {{ result.enriched_count }} enriched with skill data.
+      {% if result.enriched_count < result.catalog_size %}
+      <form action="/catalog/enrich" method="post" class="inline-form">
+        <button class="link-button" type="submit">Enrich 25 more&hellip;</button>
+      </form>
+      {% endif %}
+    </p>
+  </aside>
+
+  <section class="results">
+    <div class="results-head">
+      <h1>
+        {% if filters.text %}&ldquo;{{ filters.text }}&rdquo; &middot; {% endif %}
+        {{ result.total }} book{{ '' if result.total == 1 else 's' }}
+      </h1>
+    </div>
+
+    {% if not result.items %}
+      <p class="empty">No books match these filters. <a href="/">Reset</a>.</p>
+    {% else %}
+    <ul class="book-grid">
+      {% for book in result.items %}
+      <li class="book-card">
+        <a class="cover-link" href="/book/{{ book.isbn13 }}">
+          {% if book.cover_url %}
+            <img class="cover" src="{{ book.cover_url }}" alt="Cover of {{ book.title }}" loading="lazy">
+          {% else %}
+            <span class="cover cover-missing">no&nbsp;cover</span>
+          {% endif %}
+        </a>
+        <div class="card-body">
+          <h2 class="card-title"><a href="/book/{{ book.isbn13 }}">{{ book.title }}</a></h2>
+          {% if book.author %}<p class="card-author">{{ book.author }}</p>{% endif %}
+
+          <p class="badges">
+            {% if book.difficulty.is_known %}
+              <span class="badge skill-{{ (book.difficulty.buckets|list|first) if book.difficulty.buckets else 'unknown' }}">{{ book.difficulty.label }}</span>
+            {% endif %}
+            {% if book.design_count %}<span class="badge count">{{ book.design_count }} diagrams</span>{% endif %}
+            {% if book.format_category and book.format_category != 'Other' %}<span class="badge fmt">{{ book.format_category }}</span>{% endif %}
+          </p>
+
+          <p class="buyline">
+            <span class="price">{{ book|price }}</span>
+            <span class="stock {{ 'ok' if book.in_stock else 'no' }}">{{ 'In stock' if book.in_stock else (book.status or 'unknown')|capitalize }}</span>
+          </p>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    {% if result.pages > 1 %}
+    <nav class="pager">
+      {% if result.page > 1 %}<a href="?{{ merge_query(request, page=result.page - 1) }}">&larr; Prev</a>{% endif %}
+      <span class="pageinfo">Page {{ result.page }} of {{ result.pages }}</span>
+      {% if result.page < result.pages %}<a href="?{{ merge_query(request, page=result.page + 1) }}">Next &rarr;</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

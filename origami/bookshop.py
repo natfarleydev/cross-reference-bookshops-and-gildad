@@ -1,149 +1,142 @@
-"""Bookshop.org lookup by ISBN.
+"""Bookshop.org product source (the authoritative "what can I buy" list).
 
-Bookshop's search UI is a client-side Algolia app (not scrapeable from static
-HTML), but it exposes a stable redirect: ``/book/<isbn13>`` -> the product page.
-The product page embeds a clean ``application/ld+json`` Product/Book blob with
-title, authors, publisher, price, availability and cover image. That JSON-LD is
-all we parse, which makes us robust to front-end churn.
+Bookshop's storefront is an instant-meilisearch app. Its proxy at
+``/api/next/instantsearch/multi-search`` speaks the Meilisearch ``/multi-search``
+protocol and needs no API key, returning clean structured JSON per product
+(title, ISBN/``ean``, author, price in minor units, stock status, cover, format).
 
-Only ISBN-13 resolves (ISBN-10 404s), so callers must normalise first; the
-``lookup`` helper does this for you.
+We use it two ways:
+
+* :func:`harvest` – page through every origami product to build the catalogue.
+* :func:`lookup` – fetch a single product by ISBN (used to refresh one book).
+
+Prices come back as integer minor units (pence/cents); we convert to major units.
 """
 
 from __future__ import annotations
 
 import json
 
-from bs4 import BeautifulSoup
-
 from . import config
-from . import isbn as isbn_utils
 from .cache import HttpClient
-from .models import BookshopListing
+from .config import Region
+from .models import BookshopBook
 
 
-def _as_list(value) -> list:
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]
+def _parse_hit(hit: dict, region: Region) -> BookshopBook:
+    price_minor = hit.get("price")
+    price = None
+    if isinstance(price_minor, int | float):
+        price = round(price_minor / 100.0, 2)
 
+    contributors = tuple(
+        c.get("name", "") for c in hit.get("contributors", []) if c.get("name")
+    )
+    path = hit.get("path", "")
+    url = f"{region.base}/{path.lstrip('/')}" if path else ""
+    currency = (hit.get("currency") or region.currency).upper()
 
-def _find_book_node(data) -> dict | None:
-    """Locate the Product/Book object inside a parsed JSON-LD document."""
-    if isinstance(data, list):
-        for item in data:
-            node = _find_book_node(item)
-            if node:
-                return node
-        return None
-    if isinstance(data, dict):
-        types = _as_list(data.get("@type"))
-        if any(t in ("Book", "Product") for t in types):
-            return data
-        if "@graph" in data:
-            return _find_book_node(data["@graph"])
-    return None
-
-
-def _extract_authors(node: dict) -> tuple[str, ...]:
-    authors = []
-    for a in _as_list(node.get("author")):
-        if isinstance(a, dict) and a.get("name"):
-            authors.append(a["name"])
-        elif isinstance(a, str):
-            authors.append(a)
-    return tuple(authors)
-
-
-def _extract_price(node: dict) -> tuple[float | None, str]:
-    offers = node.get("offers")
-    if isinstance(offers, list):
-        offers = offers[0] if offers else None
-    if not isinstance(offers, dict):
-        # Some pages put price directly on the node.
-        price = node.get("price")
-        currency = node.get("priceCurrency", "USD")
-    else:
-        price = offers.get("price")
-        currency = offers.get("priceCurrency", "USD")
-    try:
-        price = float(price) if price is not None and price != "" else None
-    except (TypeError, ValueError):
-        price = None
-    return price, (currency or "USD").upper()
-
-
-def _availability(node: dict) -> str:
-    offers = node.get("offers")
-    if isinstance(offers, list):
-        offers = offers[0] if offers else None
-    avail = ""
-    if isinstance(offers, dict):
-        avail = offers.get("availability", "")
-    if not avail:
-        avail = node.get("availability", "")
-    # Normalise "https://schema.org/InStock" -> "InStock".
-    return avail.rsplit("/", 1)[-1] if avail else ""
-
-
-def parse_product(html: str, url: str = "") -> BookshopListing | None:
-    """Parse a Bookshop product page (via its JSON-LD) into a listing."""
-    soup = BeautifulSoup(html, "lxml")
-    node = None
-    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
-        if not script.string and not script.text:
-            continue
-        try:
-            data = json.loads(script.string or script.text)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        node = _find_book_node(data)
-        if node:
-            break
-    if node is None:
-        return None
-
-    isbn13 = node.get("isbn") or node.get("gtin13") or node.get("sku") or ""
-    isbn13 = isbn_utils.to_isbn13(isbn13) or isbn13
-    image = node.get("image")
-    if isinstance(image, list):
-        image = image[0] if image else ""
-    brand = node.get("brand")
-    publisher = ""
-    if isinstance(brand, dict):
-        publisher = brand.get("name", "")
-    elif isinstance(node.get("publisher"), dict):
-        publisher = node["publisher"].get("name", "")
-
-    price, currency = _extract_price(node)
-
-    return BookshopListing(
-        isbn13=isbn13,
-        title=node.get("name", ""),
-        url=url,
-        authors=_extract_authors(node),
-        publisher=publisher,
+    return BookshopBook(
+        isbn13=str(hit.get("ean", "")),
+        title=hit.get("title", ""),
+        subtitle=hit.get("subtitle", ""),
+        author=hit.get("primary_contributor", ""),
+        contributors=contributors,
         price=price,
         currency=currency,
-        availability=_availability(node),
-        image_url=image or "",
-        description=node.get("description", ""),
+        status=hit.get("status", ""),
+        cover_url=hit.get("cover_url", ""),
+        url=url,
+        publish_date=hit.get("publish_date", "") or "",
+        format_category=hit.get("format_category", ""),
+        language=hit.get("language_code", ""),
+        series_name=hit.get("series_name", ""),
     )
 
 
-def lookup(isbn_code: str, client: HttpClient) -> BookshopListing | None:
-    """Look up a book on Bookshop by any ISBN-10/13.
+def parse_results(text: str, region: Region) -> tuple[list[BookshopBook], int]:
+    """Parse a multi-search response into (books, estimated_total)."""
+    data = json.loads(text)
+    results = data.get("results") or []
+    if not results:
+        return [], 0
+    first = results[0]
+    hits = [_parse_hit(h, region) for h in first.get("hits", [])]
+    total = int(first.get("estimatedTotalHits", len(hits)))
+    return hits, total
 
-    Returns ``None`` if the identifier isn't a real ISBN or Bookshop has no
-    listing (404). The 404 itself is cached, so unavailable books are only
-    queried once.
-    """
-    isbn13 = isbn_utils.to_isbn13(isbn_code)
-    if not isbn13:
-        return None
-    url = config.BOOKSHOP_ISBN_URL.format(isbn13=isbn13)
-    resp = client.get(url)
+
+def search_page(
+    client: HttpClient,
+    query: str,
+    *,
+    offset: int = 0,
+    limit: int = 100,
+    region: Region | None = None,
+    force_refresh: bool = False,
+) -> tuple[list[BookshopBook], int]:
+    """Fetch one page of products for ``query``."""
+    region = region or config.REGION
+    payload = {
+        "queries": [
+            {
+                "indexUid": config.BOOKSHOP_INDEX,
+                "q": query,
+                "offset": offset,
+                "limit": limit,
+            }
+        ]
+    }
+    resp = client.post_json(region.multi_search_url, payload, force_refresh=force_refresh)
     if resp.status_code != 200:
-        return None
-    listing = parse_product(resp.text, url=resp.url or url)
-    return listing
+        return [], 0
+    return parse_results(resp.text, region)
+
+
+def harvest(
+    client: HttpClient,
+    *,
+    query: str | None = None,
+    region: Region | None = None,
+    page_size: int = 100,
+    max_books: int | None = None,
+    force_refresh: bool = False,
+) -> list[BookshopBook]:
+    """Page through *all* products matching ``query`` (default: origami).
+
+    Deduplicates by ISBN and stops at ``max_books`` if given.
+    """
+    region = region or config.REGION
+    query = query if query is not None else config.CATALOG_QUERY
+
+    books: list[BookshopBook] = []
+    seen: set[str] = set()
+    offset = 0
+    total = None
+    while True:
+        page, total = search_page(
+            client, query, offset=offset, limit=page_size,
+            region=region, force_refresh=force_refresh,
+        )
+        if not page:
+            break
+        for b in page:
+            if b.isbn13 and b.isbn13 not in seen:
+                seen.add(b.isbn13)
+                books.append(b)
+        offset += page_size
+        if max_books is not None and len(books) >= max_books:
+            return books[:max_books]
+        if offset >= total:
+            break
+    return books
+
+
+def lookup(isbn13: str, client: HttpClient, region: Region | None = None) -> BookshopBook | None:
+    """Look up a single product by ISBN via the search index."""
+    region = region or config.REGION
+    page, _ = search_page(client, isbn13, offset=0, limit=5, region=region)
+    for b in page:
+        if b.isbn13 == isbn13:
+            return b
+    return page[0] if page else None
