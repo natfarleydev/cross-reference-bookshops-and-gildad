@@ -92,10 +92,10 @@ def build(level: str, out_path: Path, *, in_stock_only: bool, hide_kids: bool) -
             str(b.design_count or "—"),
             Paragraph(b.format_category or "—", cell),
             _price(b),
-            "Yes" if b.in_stock else (b.status or "—"),
+            Paragraph("Yes" if b.in_stock else (b.status or "—").capitalize(), cell),
         ])
 
-    col_widths = [9 * mm, 90 * mm, 50 * mm, 38 * mm, 18 * mm, 26 * mm, 18 * mm, 20 * mm]
+    col_widths = [9 * mm, 86 * mm, 48 * mm, 36 * mm, 18 * mm, 24 * mm, 18 * mm, 28 * mm]
     table = Table(rows, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2430")),
