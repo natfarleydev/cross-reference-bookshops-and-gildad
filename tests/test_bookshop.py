@@ -34,6 +34,20 @@ def test_product_url_and_stock(bookshop_meili_json):
     assert b.in_stock == (b.status.lower().strip() == "in stock")
 
 
+def test_parse_handles_null_fields():
+    # Bookshop sometimes sends contributors:null and missing price/path.
+    payload = (
+        '{"results":[{"estimatedTotalHits":1,"hits":[{'
+        '"ean":"9780000000001","title":"X","contributors":null,'
+        '"primary_contributor":null}]}]}'
+    )
+    books, total = bookshop.parse_results(payload, REGIONS["uk"])
+    assert total == 1
+    assert books[0].contributors == ()
+    assert books[0].author == ""
+    assert books[0].price is None
+
+
 class FakeResp:
     def __init__(self, text, status=200, url="http://x"):
         self.text, self.status_code, self.url = text, status, url

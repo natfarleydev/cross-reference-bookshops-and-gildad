@@ -30,27 +30,32 @@ def _parse_hit(hit: dict, region: Region) -> BookshopBook:
         price = round(price_minor / 100.0, 2)
 
     contributors = tuple(
-        c.get("name", "") for c in hit.get("contributors", []) if c.get("name")
+        c.get("name", "") for c in (hit.get("contributors") or []) if c.get("name")
     )
-    path = hit.get("path", "")
+
+    def s(key: str) -> str:
+        """Get a string field, coercing JSON null/missing to ''."""
+        return str(hit.get(key) or "")
+
+    path = s("path")
     url = f"{region.base}/{path.lstrip('/')}" if path else ""
     currency = (hit.get("currency") or region.currency).upper()
 
     return BookshopBook(
-        isbn13=str(hit.get("ean", "")),
-        title=hit.get("title", ""),
-        subtitle=hit.get("subtitle", ""),
-        author=hit.get("primary_contributor", ""),
+        isbn13=s("ean"),
+        title=s("title"),
+        subtitle=s("subtitle"),
+        author=s("primary_contributor"),
         contributors=contributors,
         price=price,
         currency=currency,
-        status=hit.get("status", ""),
-        cover_url=hit.get("cover_url", ""),
+        status=s("status"),
+        cover_url=s("cover_url"),
         url=url,
-        publish_date=hit.get("publish_date", "") or "",
-        format_category=hit.get("format_category", ""),
-        language=hit.get("language_code", ""),
-        series_name=hit.get("series_name", ""),
+        publish_date=s("publish_date"),
+        format_category=s("format_category"),
+        language=s("language_code"),
+        series_name=s("series_name"),
     )
 
 
