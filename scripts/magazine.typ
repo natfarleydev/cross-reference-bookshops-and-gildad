@@ -22,6 +22,23 @@
   complex: rgb("#ae3ec9"),
 )
 
+// The coloured running header anchors every page to a "section". The sections
+// are the skill levels (a book's detail page belongs to its skill band); the
+// legend/front-matter uses the accent colour under the name "The Guide".
+#let section-color = (
+  guide: accent,
+  simple: bucket-color.simple,
+  intermediate: bucket-color.intermediate,
+  complex: bucket-color.complex,
+)
+#let bucket-section = (
+  simple: "Beginner", intermediate: "Intermediate", complex: "Complex",
+)
+// Current section, read by the page header; updated as the document advances.
+// Defaults to the front-matter section so the legend page (whose own update
+// would land too late for its header) is anchored too.
+#let cur = state("cur", (name: "The Guide", key: "guide"))
+
 #let img-or(path, ..args) = if path != "" { image("/" + path, ..args) } else {
   box(fill: rgb("#f1efe9"), ..args, inset: 2pt)[
     #set text(7pt, fill: muted)
@@ -37,8 +54,25 @@
 #set text(font: ("Arial", "Liberation Sans"), size: 10pt, fill: ink)
 #set page(
   paper: "a4",
-  margin: (x: 14mm, top: 14mm, bottom: 16mm),
+  margin: (x: 14mm, top: 20mm, bottom: 16mm),
   fill: paper,
+  // Full-bleed coloured running header naming the current section.
+  header: context {
+    let c = cur.get()
+    if c.name == "" { return none }
+    block(
+      width: 100%, fill: section-color.at(c.key),
+      inset: (y: 3mm), outset: (x: 14mm),
+    )[
+      #set text(fill: white, size: 8.5pt)
+      #grid(
+        columns: (1fr, auto),
+        strong(upper(c.name)),
+        [The Origami Book Guide],
+      )
+    ]
+  },
+  header-ascent: 6mm,
   footer: context {
     set text(7.5pt, fill: muted)
     grid(
@@ -52,7 +86,7 @@
 // ===========================================================================
 // COVER (full bleed)
 // ===========================================================================
-#page(margin: 0pt, footer: none, fill: ink)[
+#page(margin: 0pt, header: none, footer: none, fill: ink)[
   #place(top + left, polygon(fill: accent, (0mm, 0mm), (42mm, 0mm), (0mm, 42mm)))
   #place(bottom + right, polygon(fill: rgb("#9a330a"),
     (56mm, 56mm), (0mm, 56mm), (56mm, 0mm)))
@@ -140,6 +174,7 @@
 ]
 
 #for sec in data.sections {
+  cur.update((name: sec.label, key: sec.key))
   pagebreak()
   block(width: 100%, fill: bucket-color.at(sec.key), inset: 8pt)[
     #set text(fill: white)
@@ -156,25 +191,26 @@
 // ===========================================================================
 // PER-BOOK DETAIL PAGES
 // ===========================================================================
-#let model-line(m) = block(breakable: false)[
-  #text(9pt)[#m.name#if m.designer != "" [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
+#let model-line(m, size: 9pt) = block(breakable: false)[
+  #text(size)[#m.name#if m.designer != "" [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
 ]
 
 #for b in data.details {
+  cur.update((name: bucket-section.at(b.bucket), key: b.bucket))
   pagebreak()
   box(width: 0pt, height: 0pt)
   [#metadata(b.isbn13)#label("book_" + b.isbn13)]
-  text(18pt, weight: "bold")[#b.title]
-  if b.subtitle != "" [ #linebreak() #text(11pt, fill: muted)[#b.subtitle] ]
-  linebreak()
-  text(11pt, fill: muted)[#b.author]
-  v(2mm)
-  text(10pt)[*#b.difficulty* · #b.design_count diagrams #h(3mm)·#h(3mm) *#b.price* · #b.format · #b.stock]
+  text(20pt, weight: "bold")[#b.title]
+  v(1.6mm)
+  if b.subtitle != "" [ #text(11.5pt, fill: muted)[#b.subtitle] #v(1mm) ]
+  text(11.5pt, fill: muted)[#b.author]
+  v(3.5mm)
+  text(10.5pt)[*#b.difficulty* · #b.design_count diagrams #h(3mm)·#h(3mm) *#b.price* · #b.format · #b.stock]
   if b.url != "" [
-    #linebreak()
-    #text(10pt)[#link(b.url)[#text(fill: accent, weight: "bold")[Buy on Bookshop.org »]]]
+    #v(1.6mm)
+    #text(10.5pt)[#link(b.url)[#text(fill: accent, weight: "bold")[Buy on Bookshop.org »]]]
   ]
-  v(4mm)
+  v(7mm)
   grid(
     columns: (50mm, 1fr),
     gutter: 6mm,
@@ -195,17 +231,19 @@
       text(8pt, fill: muted)[No model photos on Gilad for this title.]
     },
   )
-  v(5mm)
+  v(8mm)
   if b.models.len() > 0 {
-    text(11pt, weight: "bold")[All #b.models.len() models]
-    v(3mm)
+    // Long lists go to 3 columns to fit; shorter ones stay roomy at 2.
+    let ncol = if b.models.len() > 40 { 3 } else { 2 }
+    text(12pt, weight: "bold")[All #b.models.len() models]
+    v(4mm)
     grid(
-      columns: (1fr, 1fr),
-      column-gutter: 8mm,
-      row-gutter: 2mm,
-      ..b.models.map(m => model-line(m)),
+      columns: (1fr,) * ncol,
+      column-gutter: if ncol == 3 { 5mm } else { 8mm },
+      row-gutter: 2.4mm,
+      ..b.models.map(m => model-line(m, size: if ncol == 3 { 8pt } else { 9pt })),
     )
   } else {
-    text(11pt, weight: "bold")[No model list available from Gilad.]
+    text(12pt, weight: "bold")[No model list available from Gilad.]
   }
 }
