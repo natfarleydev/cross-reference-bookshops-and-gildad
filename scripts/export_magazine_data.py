@@ -212,7 +212,12 @@ def main() -> int:
     catalog = Catalog()
     client = HttpClient()
     rated = [b for b in catalog.all() if b.difficulty.is_known]
-    rated.sort(key=lambda b: (b.author.lower(), b.title.lower()))
+    # Simple -> complex: order by the band's ceiling, then by its floor, so a
+    # diluted band (e.g. simple–complex) sorts before the pure band at the same
+    # ceiling (complex). Author/title break ties.
+    rated.sort(key=lambda b: (
+        b.difficulty.high, b.difficulty.low, b.author.lower(), b.title.lower(),
+    ))
     designs_cache = {b.isbn13: designs_for(b, client) for b in rated}
 
     grouped: dict[str, list] = {key: [] for key, _, _ in SECTIONS}
