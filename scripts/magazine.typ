@@ -238,9 +238,10 @@
     // Long lists go to 3 columns to fit; shorter ones stay roomy at 2.
     let ncol = if b.models.len() > 40 { 3 } else { 2 }
     text(12pt, weight: "bold")[All #b.models.len() models]
-    if b.dominant_designer != "" [
-      #text(10pt, fill: muted)[ — all designed by #b.dominant_designer unless otherwise stated]
-    ]
+    if b.dominant_designer != "" {
+      let has-exc = b.models.any(m => m.designer != "" and m.designer != b.dominant_designer)
+      text(10pt, fill: muted)[ — designed by #b.dominant_designer#if has-exc [ unless otherwise stated]]
+    }
     v(4mm)
     grid(
       columns: (1fr,) * ncol,
