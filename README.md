@@ -8,6 +8,11 @@ pulled from [Gilad's Origami Database](https://www.giladorigami.com/).
 Bookshop.org sells origami books but is hard to browse: you can't filter by
 ability and you can't see what models a book contains. This app fixes that.
 
+> 🛠️ **Vibe-coded.** Built conversationally with Claude Code — described what I
+> wanted, iterated on the results, kept what worked. Architecture, tests, and
+> docs are real, but the process was exploratory rather than spec-first. Treat it
+> as a personal tool, not production software.
+
 ![browse](docs/screenshot.png)
 
 ## How it works
@@ -35,6 +40,28 @@ python app.py                 # open http://127.0.0.1:8000
 ```
 
 Switch region/currency with `ORIGAMI_REGION=us` (default `uk`).
+
+## Export a PDF
+
+Turn the catalogue into a printable, magazine-style guide:
+
+- a **cover** with the generation date/time,
+- a how-to-use page,
+- one **section per skill level**, each book a card whose title links to its
+  full page, and
+- one **full page per book** — bigger cover, a sampling of model photos from
+  Gilad, the *complete* list of models inside, the skill rating, and a link to
+  the book's Bookshop.org page.
+
+```bash
+PYTHONPATH=. .venv/Scripts/python scripts/magazine.py    # -> out/origami_magazine.pdf
+PYTHONPATH=. .venv/Scripts/python scripts/magazine.py --out mag.pdf
+```
+
+Images are downloaded once (`out/covers/`, `out/gilad_imgs/`) and downsampled to
+180 DPI (`out/covers_180dpi/`) to keep the PDF reasonable. There's also a simpler
+per-level table export at
+`scripts/export_pdf.py --level {simple,intermediate,complex}`.
 
 ## Develop
 
