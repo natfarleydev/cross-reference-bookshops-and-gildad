@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 
 import requests
@@ -165,6 +166,14 @@ def _card(book, designs: list) -> dict:
     }
 
 
+def _dominant_designer(designs: list) -> str:
+    """The designer behind >80% of a book's models, else "" (mixed authorship)."""
+    if not designs:
+        return ""
+    name, count = Counter(d.designer for d in designs).most_common(1)[0]
+    return name if name and count / len(designs) > 0.8 else ""
+
+
 def _detail(book, designs: list) -> dict:
     thumbs = []
     for d in designs:
@@ -190,6 +199,7 @@ def _detail(book, designs: list) -> dict:
         "cover": cover_path(book),
         "gilad": book.gilad_url,
         "thumbs": thumbs,
+        "dominant_designer": _dominant_designer(designs),
         "models": [
             {"name": d.name, "designer": d.designer, "page": d.page,
              "cp": d.has_crease_pattern}

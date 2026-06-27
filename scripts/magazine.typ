@@ -191,8 +191,10 @@
 // ===========================================================================
 // PER-BOOK DETAIL PAGES
 // ===========================================================================
-#let model-line(m, size: 9pt) = block(breakable: false)[
-  #text(size)[#m.name#if m.designer != "" [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
+// `dominant` is the designer of >80% of the book's models; when a line matches
+// it the name is omitted (it's stated once in the section header instead).
+#let model-line(m, dominant: "", size: 9pt) = block(breakable: false)[
+  #text(size)[#m.name#if m.designer != "" and m.designer != dominant [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
 ]
 
 #for b in data.details {
@@ -236,12 +238,16 @@
     // Long lists go to 3 columns to fit; shorter ones stay roomy at 2.
     let ncol = if b.models.len() > 40 { 3 } else { 2 }
     text(12pt, weight: "bold")[All #b.models.len() models]
+    if b.dominant_designer != "" [
+      #text(10pt, fill: muted)[ — all designed by #b.dominant_designer unless otherwise stated]
+    ]
     v(4mm)
     grid(
       columns: (1fr,) * ncol,
       column-gutter: if ncol == 3 { 5mm } else { 8mm },
       row-gutter: 2.4mm,
-      ..b.models.map(m => model-line(m, size: if ncol == 3 { 8pt } else { 9pt })),
+      ..b.models.map(m => model-line(m, dominant: b.dominant_designer,
+        size: if ncol == 3 { 8pt } else { 9pt })),
     )
   } else {
     text(12pt, weight: "bold")[No model list available from Gilad.]
