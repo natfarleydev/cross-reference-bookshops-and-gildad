@@ -22,22 +22,26 @@
   complex: rgb("#ae3ec9"),
 )
 
-// The coloured running header anchors every page to a "section". The sections
-// are the skill levels (a book's detail page belongs to its skill band); the
-// legend/front-matter uses the accent colour under the name "The Guide".
-#let section-color = (
-  guide: accent,
-  simple: bucket-color.simple,
-  intermediate: bucket-color.intermediate,
-  complex: bucket-color.complex,
+// Per-level colour ramp (simple -> super complex). A book's detail-page header
+// is filled with the gradient across its difficulty band, so the colour itself
+// shows the range; section/front-matter headers use a solid colour.
+#let level-color = (
+  rgb("#2f9e44"),  // 1 simple
+  rgb("#1ca38a"),  // 2 low intermediate
+  rgb("#1c7ed6"),  // 3 intermediate
+  rgb("#6741d9"),  // 4 high intermediate
+  rgb("#ae3ec9"),  // 5 complex
+  rgb("#d6336c"),  // 6 super complex
 )
-#let bucket-section = (
-  simple: "Beginner", intermediate: "Intermediate", complex: "Complex",
-)
+#let level-fill(lo, hi) = if lo == hi { level-color.at(lo - 1) } else {
+  gradient.linear(level-color.at(lo - 1), level-color.at(hi - 1))
+}
+
 // Current section, read by the page header; updated as the document advances.
-// Defaults to the front-matter section so the legend page (whose own update
-// would land too late for its header) is anchored too.
-#let cur = state("cur", (name: "The Guide", key: "guide"))
+// Holds a display name and a fill (solid colour or gradient). Defaults to the
+// front-matter section so the legend page (whose own update would land too late
+// for its header) is anchored too.
+#let cur = state("cur", (name: "The Guide", fill: accent))
 
 #let img-or(path, ..args) = if path != "" { image("/" + path, ..args) } else {
   box(fill: rgb("#f1efe9"), ..args, inset: 2pt)[
@@ -61,7 +65,7 @@
     let c = cur.get()
     if c.name == "" { return none }
     block(
-      width: 100%, fill: section-color.at(c.key),
+      width: 100%, fill: c.fill,
       inset: (y: 3mm), outset: (x: 14mm),
     )[
       #set text(fill: white, size: 8.5pt)
@@ -174,7 +178,7 @@
 ]
 
 #for sec in data.sections {
-  cur.update((name: sec.label, key: sec.key))
+  cur.update((name: sec.label, fill: bucket-color.at(sec.key)))
   pagebreak()
   block(width: 100%, fill: bucket-color.at(sec.key), inset: 8pt)[
     #set text(fill: white)
@@ -198,7 +202,7 @@
 ]
 
 #for b in data.details {
-  cur.update((name: bucket-section.at(b.bucket), key: b.bucket))
+  cur.update((name: b.difficulty, fill: level-fill(b.diff_low, b.diff_high)))
   pagebreak()
   box(width: 0pt, height: 0pt)
   [#metadata(b.isbn13)#label("book_" + b.isbn13)]

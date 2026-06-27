@@ -191,6 +191,8 @@ def _detail(book, designs: list) -> dict:
         "author": book.author or "Various",
         "difficulty": book.difficulty.label,
         "bucket": _bucket(book),
+        "diff_low": book.difficulty.low,
+        "diff_high": book.difficulty.high,
         "design_count": book.design_count,
         "price": _price(book),
         "format": book.format_category or "—",
