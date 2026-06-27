@@ -194,7 +194,7 @@
 // `dominant` is the designer of >80% of the book's models; when a line matches
 // it the name is omitted (it's stated once in the section header instead).
 #let model-line(m, dominant: "", size: 9pt) = block(breakable: false)[
-  #text(size)[#m.name#if m.designer != "" and m.designer != dominant [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
+  #text(size)[#m.name#if m.designer != "" and m.designer != dominant [#text(fill: muted)[#if m.designer == "Traditional" [ (traditional)] else [ — #m.designer]]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
 ]
 
 #for b in data.details {
@@ -240,7 +240,10 @@
     text(12pt, weight: "bold")[All #b.models.len() models]
     if b.dominant_designer != "" {
       let has-exc = b.models.any(m => m.designer != "" and m.designer != b.dominant_designer)
-      text(10pt, fill: muted)[ — designed by #b.dominant_designer#if has-exc [ unless otherwise stated]]
+      let credit = if b.dominant_designer == "Traditional" { "traditional designs" } else {
+        "designed by " + b.dominant_designer
+      }
+      text(10pt, fill: muted)[ — #credit#if has-exc [ unless otherwise stated]]
     }
     v(4mm)
     grid(
