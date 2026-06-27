@@ -201,47 +201,62 @@
   #text(size)[#m.name#if m.designer != "" and m.designer != dominant [#text(fill: muted)[#if m.designer == "Traditional" [ (traditional)] else [ — #m.designer]]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
 ]
 
+// The cover is the page's focal point: a large bordered image (its natural
+// aspect, no letterbox) that's clearly the biggest element on the page.
+#let hero-cover(b) = gilad-link(b.gilad, if b.cover != "" {
+  box(stroke: 0.5pt + line)[#image("/" + b.cover, width: 62mm)]
+} else {
+  box(width: 62mm, height: 88mm, fill: rgb("#f1efe9"), inset: 4pt)[
+    #set text(8pt, fill: muted)
+    #align(center + horizon)[no cover]
+  ]
+})
+
+// A row of sample model photos — lives with the model list, not beside the cover.
+#let thumb-strip(b) = grid(
+  columns: (1fr,) * 5,
+  column-gutter: 3mm,
+  ..b.thumbs.map(t => [
+    #gilad-link(b.gilad, box(width: 100%, height: 26mm, fill: white,
+      stroke: 0.4pt + line, inset: 1pt)[
+      #align(center + horizon)[#image("/" + t.img, width: 100%, height: 100%, fit: "contain")]
+    ])
+    #text(6.5pt, fill: muted)[#align(center)[#t.name]]
+  ]),
+)
+
 #for b in data.details {
   cur.update((name: b.difficulty, fill: level-fill(b.diff_low, b.diff_high)))
   pagebreak()
   box(width: 0pt, height: 0pt)
   [#metadata(b.isbn13)#label("book_" + b.isbn13)]
-  text(20pt, weight: "bold")[#b.title]
-  v(1.6mm)
-  if b.subtitle != "" [ #text(11.5pt, fill: muted)[#b.subtitle] #v(1mm) ]
-  text(11.5pt, fill: muted)[#b.author]
-  v(3.5mm)
-  text(10.5pt)[*#b.difficulty* · #b.design_count diagrams #h(3mm)·#h(3mm) *#b.price* · #b.format · #b.stock]
-  if b.url != "" [
-    #v(1.6mm)
-    #text(10.5pt)[#link(b.url)[#text(fill: accent, weight: "bold")[Buy on Bookshop.org »]]]
-  ]
-  v(7mm)
+
+  // --- Hero: prominent cover tightly grouped with the title block ---
   grid(
-    columns: (50mm, 1fr),
-    gutter: 6mm,
-    gilad-link(b.gilad, img-or(b.cover, width: 50mm, height: 70mm, fit: "contain")),
-    if b.thumbs.len() > 0 {
-      grid(
-        columns: (1fr,) * 3,
-        gutter: 3mm,
-        ..b.thumbs.map(t => [
-          #gilad-link(b.gilad, box(width: 100%, height: 30mm, fill: white,
-            stroke: 0.4pt + line, inset: 1pt)[
-            #align(center + horizon)[#image("/" + t.img, width: 100%, height: 100%, fit: "contain")]
-          ])
-          #text(6.5pt, fill: muted)[#align(center)[#t.name]]
-        ]),
-      )
-    } else {
-      text(8pt, fill: muted)[No model photos on Gilad for this title.]
-    },
+    columns: (62mm, 1fr),
+    column-gutter: 9mm,
+    hero-cover(b),
+    [
+      #text(22pt, weight: "bold")[#b.title]
+      #v(2mm)
+      #if b.subtitle != "" [ #text(12pt, fill: muted)[#b.subtitle] #v(1.5mm) ]
+      #text(12pt, fill: muted)[#b.author]
+      #v(4.5mm)
+      #text(10.5pt)[*#b.difficulty* · #b.design_count diagrams #h(3mm)·#h(3mm) *#b.price* · #b.format · #b.stock]
+      #if b.url != "" [
+        #v(2.5mm)
+        #text(10.5pt)[#link(b.url)[#text(fill: accent, weight: "bold")[Buy on Bookshop.org »]]]
+      ]
+    ],
   )
-  v(8mm)
+
+  // --- Models: a distinct section, separated by generous whitespace. The
+  // sample photos sit here with the list (same hierarchy), demoted below the
+  // hero cover. ---
+  v(12mm)
   if b.models.len() > 0 {
-    // Long lists go to 3 columns to fit; shorter ones stay roomy at 2.
     let ncol = if b.models.len() > 40 { 3 } else { 2 }
-    text(12pt, weight: "bold")[All #b.models.len() models]
+    text(13pt, weight: "bold")[All #b.models.len() model#if b.models.len() != 1 [s]]
     if b.dominant_designer != "" {
       let has-exc = b.models.any(m => m.designer != "" and m.designer != b.dominant_designer)
       let credit = if b.dominant_designer == "Traditional" { "traditional designs" } else {
@@ -249,7 +264,11 @@
       }
       text(10pt, fill: muted)[ — #credit#if has-exc [ unless otherwise stated]]
     }
-    v(4mm)
+    if b.thumbs.len() > 0 {
+      v(4mm)
+      thumb-strip(b)
+    }
+    v(5mm)
     grid(
       columns: (1fr,) * ncol,
       column-gutter: if ncol == 3 { 5mm } else { 8mm },
@@ -258,6 +277,6 @@
         size: if ncol == 3 { 8pt } else { 9pt })),
     )
   } else {
-    text(12pt, weight: "bold")[No model list available from Gilad.]
+    text(13pt, weight: "bold")[No model list available from Gilad.]
   }
 }
