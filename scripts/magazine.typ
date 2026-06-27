@@ -50,11 +50,13 @@
   ]
 }
 
-// Wrap an image in a link to its Gilad source page (provenance).
-#let gilad-link(url, body) = if url != "" { link(url, body) } else { body }
+// Wrap an image in a link to the page it came from (provenance), when known.
+#let linked(url, body) = if url != "" { link(url, body) } else { body }
+
+#let repo = "https://github.com/natfarleydev/cross-reference-bookshops-and-gildad"
 
 // --- page setup ------------------------------------------------------------
-#set document(title: "The Origami Book Guide", author: "Origami Book Finder")
+#set document(title: "Bookshop.org × Gilad (unofficial)", author: "Origami Book Finder")
 #set text(font: ("Arial", "Liberation Sans"), size: 10pt, fill: ink)
 #set page(
   paper: "a4",
@@ -72,7 +74,7 @@
       #grid(
         columns: (1fr, auto),
         strong(upper(c.name)),
-        [The Origami Book Guide],
+        [Bookshop.org × Gilad (unofficial)],
       )
     ]
   },
@@ -81,7 +83,7 @@
     set text(7.5pt, fill: muted)
     grid(
       columns: (1fr, auto),
-      [Origami Book Finder · sourced from #meta.region_host & Gilad's Origami Database],
+      [Bookshop.org × Gilad (unofficial) · data from #meta.region_host & Gilad's Origami Database · #link(repo)[source on GitHub]],
       [page #counter(page).display()],
     )
   },
@@ -97,9 +99,11 @@
   #pad(x: 20mm, y: 24mm)[
     #set text(fill: white)
     #v(40mm)
-    #text(40pt, weight: 800)[The Origami#linebreak()Book Guide]
-    #v(9mm)
-    #text(13pt)[Folder's edition · #meta.issue]
+    #text(40pt, weight: 800)[Bookshop.org#linebreak()× Gilad]
+    #v(6mm)
+    #text(15pt)[An unofficial origami book guide]
+    #v(2.5mm)
+    #text(12pt, fill: rgb("#cbd2dc"))[Folder's edition · #meta.issue]
     #v(12mm)
     #block(width: 130mm, text(13pt)[
       #meta.total_rated origami books you can buy on *#meta.region_host*,
@@ -158,7 +162,7 @@
   #grid(
     columns: (26mm, 1fr),
     gutter: 3mm,
-    gilad-link(b.gilad, img-or(b.cover, width: 26mm, height: 36mm, fit: "contain")),
+    linked(b.url, img-or(b.cover, width: 26mm, height: 36mm, fit: "contain")),
     [
       #text(10pt, weight: "bold")[#link(label("book_" + b.isbn13))[#text(fill: accent)[#b.title]]]
       #linebreak()
@@ -203,7 +207,7 @@
 
 // The cover is the page's focal point: a large bordered image (its natural
 // aspect, no letterbox) that's clearly the biggest element on the page.
-#let hero-cover(b) = gilad-link(b.gilad, if b.cover != "" {
+#let hero-cover(b) = linked(b.url, if b.cover != "" {
   box(stroke: 0.5pt + line)[#image("/" + b.cover, width: 62mm)]
 } else {
   box(width: 62mm, height: 88mm, fill: rgb("#f1efe9"), inset: 4pt)[
@@ -217,7 +221,7 @@
   columns: (1fr,) * 5,
   column-gutter: 3mm,
   ..b.thumbs.map(t => [
-    #gilad-link(b.gilad, box(width: 100%, height: 26mm, fill: white,
+    #linked(b.gilad, box(width: 100%, height: 26mm, fill: white,
       stroke: 0.4pt + line, inset: 1pt)[
       #align(center + horizon)[#image("/" + t.img, width: 100%, height: 100%, fit: "contain")]
     ])

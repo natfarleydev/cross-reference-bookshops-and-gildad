@@ -63,6 +63,17 @@ Images are downloaded once (`out/covers/`, `out/gilad_imgs/`) and downsampled to
 per-level table export at
 `scripts/export_pdf.py --level {simple,intermediate,complex}`.
 
+### "Bookshop.org × Gilad" (Typst)
+
+The richer magazine — gradient skill-band headers, hero covers, gradient-sorted
+books — is generated with [Typst](https://typst.app): a Python step exports the
+data + images, then Typst lays out the PDF (a single static binary, no browser):
+
+```bash
+PYTHONPATH=. .venv/Scripts/python scripts/export_magazine_data.py
+typst compile --root . scripts/magazine.typ out/origami_magazine_typst.pdf
+```
+
 ## Develop
 
 ```bash
@@ -78,3 +89,12 @@ This tool reads public pages from Bookshop.org and Gilad's Origami Database for
 personal use, caches aggressively to minimise requests, and links back to both.
 Please buy through the Bookshop.org links to support independent bookshops, and
 visit Gilad's site — it's a labour of love.
+
+The generated magazine, **"Bookshop.org × Gilad"**, is an **unofficial** guide —
+not affiliated with or endorsed by either Bookshop.org or Gilad's Origami Database.
+
+## License
+
+This project's own code and templates are released under
+[CC0 1.0 Universal](LICENSE) (public-domain dedication). The underlying book and
+diagram data remain the property of Bookshop.org and Gilad's Origami Database.
