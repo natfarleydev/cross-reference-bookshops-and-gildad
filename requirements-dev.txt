@@ -4,5 +4,6 @@ pytest-cov==6.0.0
 httpx==0.28.1
 ruff==0.9.2
 reportlab==4.2.5
+pillow==12.2.0
 
 pypdfium2==4.30.0

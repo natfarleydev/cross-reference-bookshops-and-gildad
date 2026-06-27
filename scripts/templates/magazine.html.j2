@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Origami Book Guide</title>
+<style>
+  @page { size: A4; margin: 0; }
+
+  :root {
+    --ink:#1f2430; --paper:#fbfaf7; --accent:#c2410c; --muted:#6b7280;
+    --simple:#2f9e44; --inter:#1c7ed6; --complex:#ae3ec9;
+    --card:#ffffff; --line:#e6e2da;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif,
+                 "Noto Color Emoji", "Segoe UI Emoji";
+    color: var(--ink); background: var(--paper);
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    font-size: 10pt; line-height: 1.4;
+  }
+  .pad { padding: 14mm 14mm 18mm 14mm; }
+
+  /* repeats on every printed page (Chromium prints position:fixed each page) */
+  .footer {
+    position: fixed; left: 0; right: 0; bottom: 6mm;
+    padding: 0 14mm; font-size: 7.5pt; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+
+  .break { break-before: page; }
+
+  /* ---- cover (full bleed) ---- */
+  .cover {
+    background: var(--ink); color:#fff; height: 297mm; padding: 24mm 20mm;
+    position: relative; overflow: hidden; break-after: page;
+  }
+  .cover .tri-tl { position:absolute; top:0; left:0; width:0; height:0;
+    border-top: 42mm solid var(--accent); border-right: 42mm solid transparent; opacity:.9; }
+  .cover .tri-br { position:absolute; bottom:0; right:0; width:0; height:0;
+    border-bottom: 56mm solid #9a330a; border-left: 56mm solid transparent; }
+  .cover h1 { font-size: 40pt; line-height:1.05; margin: 40mm 0 0; font-weight:800; }
+  .cover .issue { font-size: 13pt; margin-top: 8mm; }
+  .cover .gen { font-size: 10pt; color:#cbd2dc; margin-top: 2mm; }
+  .cover .lede { font-size: 13pt; margin-top: 14mm; max-width: 130mm; }
+  .cover .teaser { font-size: 10pt; color:#cbd2dc; margin-top: 16mm; line-height:1.9; }
+
+  /* ---- legend ---- */
+  h2 { font-size: 15pt; margin: 0 0 4mm; }
+  .legend p { font-size: 9.5pt; margin: 0 0 4mm; max-width: 160mm; }
+
+  .em { font-family: "Noto Color Emoji", "Segoe UI Emoji"; font-size: .85em;
+    margin-right: .3em; line-height: 1; }
+  .key-simple { color: var(--simple); font-weight:700; }
+  .key-inter  { color: var(--inter); font-weight:700; }
+  .key-complex{ color: var(--complex); font-weight:700; }
+
+  /* ---- section divider ---- */
+  .divider { color:#fff; padding: 7mm 8mm; margin-bottom: 6mm; }
+  .divider.simple { background: var(--simple); }
+  .divider.inter  { background: var(--inter); }
+  .divider.complex{ background: var(--complex); }
+  .divider h2 { color:#fff; margin:0; font-size:16pt; }
+  .divider .sub { font-size: 9pt; margin-top: 2mm; }
+
+  /* ---- listing cards (two columns, flow across pages) ---- */
+  .cards { column-count: 2; column-gap: 8mm; }
+  .card { break-inside: avoid; display: flex; gap: 3mm; padding: 3mm 0;
+    border-bottom: .4pt solid var(--line); }
+  .card .cv { width: 26mm; height: 36mm; object-fit: contain; flex: 0 0 26mm; }
+  .card .nocv { width:26mm; height:36mm; flex:0 0 26mm; background:#f1efe9;
+    color:var(--muted); font-size:7pt; display:flex; align-items:center;
+    justify-content:center; text-align:center; }
+  .card .ti { font-size: 10pt; font-weight: 700; line-height:1.15; margin:0; }
+  .card .ti a { color: var(--accent); text-decoration: none; }
+  .card .au { font-size: 8pt; color: var(--muted); margin: 1mm 0; }
+  .card .me { font-size: 8pt; margin: 0; }
+  .card .inside { font-size: 7.2pt; color: var(--ink); margin: 1.5mm 0 0; }
+
+  /* ---- per-book detail page ---- */
+  .book { break-before: page; }
+  .book h2 { font-size: 18pt; margin: 0 0 1mm; color: var(--ink); }
+  .book .sub { font-size: 11pt; color: var(--muted); margin: 0 0 1mm; }
+  .book .au { font-size: 11pt; color: var(--muted); margin: 0 0 3mm; }
+  .book .me { font-size: 10pt; margin: 0 0 1mm; }
+  .book .buy a { color: var(--accent); font-weight:700; text-decoration:none; }
+  .book .top { display: flex; gap: 6mm; margin: 4mm 0; }
+  .book .top .cv { width: 50mm; object-fit: contain; flex: 0 0 50mm; }
+  .book .top .nocv { width:50mm; height:70mm; flex:0 0 50mm; background:#f1efe9;
+    color:var(--muted); font-size:8pt; display:flex; align-items:center;
+    justify-content:center; }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 3mm; align-content: flex-start; }
+  .thumb { width: 30mm; }
+  .thumb img { width: 30mm; height: 30mm; object-fit: cover; border:.4pt solid var(--line); }
+  .thumb .cap { font-size: 6.5pt; color: var(--muted); text-align:center;
+    margin-top: 1mm; line-height:1.1; }
+  .nophotos { font-size: 8pt; color: var(--muted); }
+
+  .models-h { font-size: 11pt; font-weight:700; margin: 5mm 0 3mm; }
+  .models { column-count: 3; column-gap: 6mm; font-size: 8pt; }
+  .model { break-inside: avoid; line-height: 1.35; margin: 0 0 .5mm; }
+  .model .by { color: var(--muted); }
+  .model .pg { color: var(--muted); }
+  .model .cp { color: var(--complex); font-weight:700; }
+</style>
+</head>
+<body>
+
+<div class="footer">
+  <span>Origami Book Finder · sourced from {{ region_host }} &amp; Gilad's Origami Database</span>
+  <span>The Origami Book Guide</span>
+</div>
+
+<!-- COVER -->
+<section class="cover">
+  <div class="tri-tl"></div>
+  <div class="tri-br"></div>
+  <h1>The Origami<br>Book Guide</h1>
+  <div class="issue">Folder&rsquo;s edition · {{ issue }}</div>
+  <div class="gen">Generated {{ generated }}</div>
+  <div class="lede">{{ total_rated }} origami books you can buy on <b>{{ region_host }}</b>,
+    hand-sorted by skill level with the models inside each one.</div>
+  <div class="teaser">
+    Beginner · {{ counts.simple }} books<br>
+    Intermediate · {{ counts.intermediate }} books<br>
+    Complex · {{ counts.complex }} books
+  </div>
+</section>
+
+<!-- LEGEND -->
+<section class="pad legend">
+  <h2>How to use this guide</h2>
+  <p>Every book here is in stock or orderable on Bookshop.org (UK) — buy through the
+    linked title to support independent bookshops. Skill levels and the list of models
+    inside each book come from <b>Gilad&rsquo;s Origami Database</b>.</p>
+  <p>The shop carries {{ catalog_size }} origami titles; {{ total_rated }} of them have a
+    published skill rating and appear in the sections that follow. The rest (paper packs,
+    unrated reprints, e-books) are browsable in the companion web app.</p>
+
+  <h2>Skill levels &amp; the difficulty key</h2>
+  <p><span class="em">🟢</span><span class="key-simple">Beginner</span> —
+    simple folds and first models, a gentle place to start.</p>
+  <p><span class="em">🔵</span><span class="key-inter">Intermediate</span> —
+    shaping, sinks and modular work without the white-knuckle complexity.</p>
+  <p><span class="em">🟣</span><span class="key-complex">Complex</span> —
+    many-step insects, dragons and tessellations for experienced folders.</p>
+  <p style="font-size:8.5pt;color:var(--muted)">Each model in a book is tagged with its
+    book&rsquo;s skill emoji. <span class="cp" style="color:var(--complex);font-weight:700">[CP]</span>
+    marks a crease-pattern-only design.</p>
+</section>
+
+<!-- SECTION LISTINGS -->
+{% for sec in sections %}
+<section class="pad break">
+  <div class="divider {{ sec.css }}">
+    <h2>{{ sec.label }} · {{ sec.books|length }} books</h2>
+    <div class="sub">{{ sec.blurb }}</div>
+  </div>
+  <div class="cards">
+    {% for b in sec.books %}
+    <div class="card">
+      {% if b.cover %}<img class="cv" src="{{ b.cover }}">{% else %}<div class="nocv">no cover</div>{% endif %}
+      <div>
+        <p class="ti"><a href="#book_{{ b.isbn13 }}">{{ b.title }}</a></p>
+        <p class="au">{{ b.author }}</p>
+        <p class="me"><span class="em">{{ b.emoji }}</span><b>{{ b.difficulty }}</b>
+          · {{ b.design_count }} diagrams<br><b>{{ b.price }}</b> · {{ b.format }} · {{ b.stock }}</p>
+        {% if b.sample %}<p class="inside"><i>Inside:</i> {{ b.sample }}</p>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+<!-- PER-BOOK DETAIL PAGES -->
+{% for b in details %}
+<section class="book pad" id="book_{{ b.isbn13 }}">
+  <h2>{{ b.title }}</h2>
+  {% if b.subtitle %}<p class="sub">{{ b.subtitle }}</p>{% endif %}
+  <p class="au">{{ b.author }}</p>
+  <p class="me"><span class="em">{{ b.emoji }}</span><b>{{ b.difficulty }}</b>
+    · {{ b.design_count }} diagrams &nbsp;·&nbsp; <b>{{ b.price }}</b> · {{ b.format }} · {{ b.stock }}</p>
+  {% if b.url %}<p class="me buy"><a href="{{ b.url }}">Buy on Bookshop.org »</a></p>{% endif %}
+
+  <div class="top">
+    {% if b.cover %}<img class="cv" src="{{ b.cover }}">{% else %}<div class="nocv">no cover</div>{% endif %}
+    {% if b.thumbs %}
+    <div class="thumbs">
+      {% for t in b.thumbs %}
+      <div class="thumb"><img src="{{ t.img }}"><div class="cap">{{ t.name }}</div></div>
+      {% endfor %}
+    </div>
+    {% else %}<div class="nophotos">No model photos on Gilad for this title.</div>{% endif %}
+  </div>
+
+  {% if b.models %}
+  <div class="models-h">All {{ b.models|length }} models</div>
+  <div class="models">
+    {% for m in b.models %}
+    <div class="model"><span class="em">{{ b.emoji }}</span>{{ m.name }}{% if m.designer %}<span class="by"> — {{ m.designer }}</span>{% endif %}{% if m.page %}<span class="pg"> · p.{{ m.page }}</span>{% endif %}{% if m.cp %} <span class="cp">[CP]</span>{% endif %}</div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="models-h">No model list available from Gilad.</div>
+  {% endif %}
+</section>
+{% endfor %}
+
+</body>
+</html>
