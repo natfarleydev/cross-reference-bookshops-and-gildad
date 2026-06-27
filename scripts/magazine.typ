@@ -156,8 +156,8 @@
 // ===========================================================================
 // PER-BOOK DETAIL PAGES
 // ===========================================================================
-#let model-line(m) = block(breakable: false, below: 0.6mm)[
-  #text(8pt)[#m.name#if m.designer != "" [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
+#let model-line(m) = block(breakable: false)[
+  #text(9pt)[#m.name#if m.designer != "" [#text(fill: muted)[ — #m.designer]]#if m.page != "" [#text(fill: muted)[ · p.#m.page]]#if m.cp [ #text(fill: bucket-color.complex, weight: "bold")[\[CP\]]]]
 ]
 
 #for b in data.details {
@@ -201,8 +201,8 @@
     v(3mm)
     grid(
       columns: (1fr, 1fr),
-      column-gutter: 6mm,
-      row-gutter: 0pt,
+      column-gutter: 8mm,
+      row-gutter: 2mm,
       ..b.models.map(m => model-line(m)),
     )
   } else {
