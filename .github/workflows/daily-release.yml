@@ -36,20 +36,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Restore catalogue + HTTP cache
+        # Carry data/ (the SQLite catalogue *and* the cache-first HTTP store)
+        # between runs so we never rebuild from scratch. The unique key always
+        # misses on save, so each run writes a fresh cache; restore-keys pulls in
+        # the most recent previous one. With this in place the daily build only
+        # re-harvests Bookshop (cheap) and enriches *new* books — the slow,
+        # rarely-changing Gilad pass is reused, not repeated.
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: origami-data-${{ github.run_id }}
+          restore-keys: |
+            origami-data-
+
       - name: Lint and test
         run: |
           python -m ruff check app.py origami tests
           python -m pytest -q
 
-      - name: Build the catalogue (harvest Bookshop + enrich with Gilad)
-        # Best-effort: the upstream sites occasionally rate-limit or change shape.
-        # If the build can't complete we still publish a release noting the gap,
-        # rather than failing the whole job.
+      - name: Build the catalogue (refresh Bookshop, reuse Gilad enrichment)
+        # --refresh re-harvests Bookshop for new titles / current stock & price,
+        # but upsert preserves existing enrichment and enrich_all only queries
+        # Gilad for not-yet-enriched books (and those lookups hit the cache too).
+        # Best-effort: upstream sites occasionally rate-limit or change shape, so
+        # if the build can't complete we still publish a release noting the gap.
         continue-on-error: true
         env:
           ORIGAMI_REGION: uk
         run: |
-          python -m origami.ingest
+          python -m origami.ingest --refresh
 
       - name: Package the catalogue
         id: package
