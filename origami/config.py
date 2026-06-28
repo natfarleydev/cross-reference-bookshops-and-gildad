@@ -75,22 +75,36 @@ REGION = REGIONS[os.environ.get("ORIGAMI_REGION", "uk").lower()]
 # The Meilisearch index that holds sellable products.
 BOOKSHOP_INDEX = os.environ.get("ORIGAMI_BOOKSHOP_INDEX", "products")
 
-# The full-text queries used to scope the catalogue. We want the BIC subject
-# "Origami & paper engineering" (BIC/Thema code WFT), but Bookshop's public
-# instant-meilisearch proxy doesn't expose a category/BIC facet we can filter on,
-# so we approximate that subject by running its text terms as *separate* searches
-# and merging the de-duped results (``harvest`` joins on ISBN). This casts a
-# broader net than "origami" alone — it also catches kirigami / pop-up /
-# paper-engineering titles that don't literally say "origami".
+# The full-text query/queries used to scope the catalogue to origami titles.
+# Override with a comma-separated ``ORIGAMI_CATALOG_QUERY``.
 #
-# Override with a comma-separated ``ORIGAMI_CATALOG_QUERY`` (e.g. "origami").
+# Note: keep this *tight*. Bookshop's Meilisearch is fuzzy and OR-matches terms,
+# so a query like "paper engineering" matches any book containing "paper" *or*
+# "engineering" (engineering textbooks included) — ~1000 mostly-irrelevant hits.
+# Breadth comes from the subject filter below instead, not from loose text terms.
 CATALOG_QUERIES = tuple(
     q.strip()
-    for q in os.environ.get("ORIGAMI_CATALOG_QUERY", "origami, paper engineering").split(",")
+    for q in os.environ.get("ORIGAMI_CATALOG_QUERY", "origami").split(",")
     if q.strip()
 ) or ("origami",)
 # Backwards-compatible single-query alias (first query).
 CATALOG_QUERY = CATALOG_QUERIES[0]
+
+# To broaden the catalogue to the BIC/Thema subject "Origami & paper engineering"
+# we filter the index server-side by subject code (the proxy *does* accept a
+# Meilisearch ``filter`` on ``subjects``, confirmed against the live API):
+#   WFTM  Origami & paper folding          (the clean origami set)
+#   WFT   Paper crafts & paper engineering (parent: pop-ups, cut-and-fold,
+#                                           paper models, paper airplanes)
+# ``harvest`` runs this as an extra search and merges by ISBN, so it adds
+# paper-engineering titles that don't literally say "origami" without the noise
+# of a fuzzy text query. Override with a comma-separated ``ORIGAMI_BOOKSHOP_SUBJECTS``
+# (set it empty to disable the subject pass and use text queries only).
+BOOKSHOP_SUBJECTS = tuple(
+    s.strip()
+    for s in os.environ.get("ORIGAMI_BOOKSHOP_SUBJECTS", "WFTM, WFT").split(",")
+    if s.strip()
+)
 
 
 # --- Gilad -----------------------------------------------------------------

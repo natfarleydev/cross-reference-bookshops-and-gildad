@@ -41,6 +41,24 @@ python app.py                 # open http://127.0.0.1:8000
 
 Switch region/currency with `ORIGAMI_REGION=us` (default `uk`).
 
+### Skip the build: download the prebuilt catalogue
+
+The first `ingest` takes a few minutes (it harvests Bookshop and enriches every
+book against Gilad). To skip it, grab the prebuilt catalogue from the
+[**Releases**](https://github.com/natfarleydev/cross-reference-bookshops-and-gildad/releases)
+page — a [daily workflow](.github/workflows/daily-release.yml) publishes a fresh,
+gzipped `catalog.sqlite` (tagged `catalog-YYYY-MM-DD`) with current prices/stock:
+
+```bash
+# download origami-catalog-<date>.sqlite.gz from the latest release, then:
+gzip -dc origami-catalog-*.sqlite.gz > data/catalog.sqlite
+python app.py
+```
+
+Now `python app.py` serves instantly with no harvest. (Bookshop's text query for
+"origami" plus the BIC/Thema subject filter "Origami & paper engineering"
+(`WFTM`/`WFT`) gives ~1150 books.)
+
 ## Export a PDF
 
 Turn the catalogue into a printable, magazine-style guide:

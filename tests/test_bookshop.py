@@ -93,11 +93,13 @@ class RecordingClient:
 
 def test_harvest_merges_multiple_queries_deduped(bookshop_meili_json):
     # Two queries that both return the same fixture must merge to one deduped set,
-    # and each query must actually be issued (broader BIC-style search).
+    # and each query must actually be issued. subjects=() keeps this focused on
+    # the text-query merge (no extra subject-filter pass).
     client = RecordingClient(bookshop_meili_json)
     books = bookshop.harvest(
         client,
         queries=["origami", "paper engineering"],
+        subjects=(),
         region=REGIONS["uk"],
         page_size=5,
     )
@@ -107,8 +109,61 @@ def test_harvest_merges_multiple_queries_deduped(bookshop_meili_json):
     assert len(books) == 5  # identical fixtures collapse to a single set
 
 
-def test_default_catalog_queries_cover_paper_engineering():
+def test_search_page_filters_by_subjects(bookshop_meili_json):
+    # Passing subjects must add a Meilisearch OR-filter on the subjects attribute.
+    captured: dict = {}
+
+    class Capturing:
+        def post_json(self, url, payload, force_refresh=False):
+            captured["payload"] = payload
+            return FakeResp(bookshop_meili_json)
+
+    bookshop.search_page(Capturing(), "", subjects=["WFTM", "WFT"], region=REGIONS["uk"])
+    assert captured["payload"]["queries"][0]["filter"] == [
+        ["subjects = WFTM", "subjects = WFT"]
+    ]
+
+
+def test_harvest_runs_text_and_subject_searches(bookshop_meili_json):
+    # harvest must issue the text query *and* a subject-filter search (q=""),
+    # then merge both into one deduped set.
+    served: set = set()
+    calls: list = []
+
+    class SubjectAware:
+        def post_json(self, url, payload, force_refresh=False):
+            q0 = payload["queries"][0]
+            fkey = tuple(tuple(x) for x in q0["filter"]) if q0.get("filter") else None
+            calls.append((q0["q"], fkey))
+            key = (q0["q"], fkey)
+            # First page of each distinct (query, filter) returns the fixture.
+            if q0["offset"] == 0 and key not in served:
+                served.add(key)
+                return FakeResp(bookshop_meili_json)
+            return FakeResp('{"results":[{"hits":[],"estimatedTotalHits":546}]}')
+
+    books = bookshop.harvest(
+        SubjectAware(),
+        queries=["origami"],
+        subjects=["WFTM", "WFT"],
+        region=REGIONS["uk"],
+        page_size=5,
+    )
+    text_calls = [c for c in calls if c[1] is None]
+    subj_calls = [c for c in calls if c[1] is not None]
+    assert ("origami", None) in text_calls
+    assert subj_calls[0][1] == (("subjects = WFTM", "subjects = WFT"),)
+    assert subj_calls[0][0] == ""  # subject pass uses an empty text query
+    isbns = [b.isbn13 for b in books]
+    assert len(isbns) == len(set(isbns))  # deduped across both searches
+    assert len(books) == 5  # identical fixtures collapse to a single set
+
+
+def test_default_scope_is_origami_text_plus_subject_filter():
     from origami import config
 
-    assert config.CATALOG_QUERIES[0] == "origami"
-    assert "paper engineering" in config.CATALOG_QUERIES
+    # Text scope is tight (just "origami"); breadth comes from the subject filter.
+    assert config.CATALOG_QUERIES == ("origami",)
+    # BIC/Thema "Origami & paper engineering" is a real server-side filter now.
+    assert "WFTM" in config.BOOKSHOP_SUBJECTS  # origami & paper folding
+    assert "WFT" in config.BOOKSHOP_SUBJECTS  # paper crafts & paper engineering

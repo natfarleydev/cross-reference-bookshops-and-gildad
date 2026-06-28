@@ -79,20 +79,26 @@ def search_page(
     offset: int = 0,
     limit: int = 100,
     region: Region | None = None,
+    subjects: Sequence[str] | None = None,
     force_refresh: bool = False,
 ) -> tuple[list[BookshopBook], int]:
-    """Fetch one page of products for ``query``."""
+    """Fetch one page of products for ``query``.
+
+    If ``subjects`` is given, the index is filtered server-side to those BIC/Thema
+    subject codes (OR'd together) via Meilisearch's ``filter`` — used to scope the
+    catalogue by category rather than by fuzzy text.
+    """
     region = region or config.REGION
-    payload = {
-        "queries": [
-            {
-                "indexUid": config.BOOKSHOP_INDEX,
-                "q": query,
-                "offset": offset,
-                "limit": limit,
-            }
-        ]
+    meili_query: dict = {
+        "indexUid": config.BOOKSHOP_INDEX,
+        "q": query,
+        "offset": offset,
+        "limit": limit,
     }
+    if subjects:
+        # Meilisearch filter syntax: inner list = OR. Match any of the codes.
+        meili_query["filter"] = [[f"subjects = {code}" for code in subjects]]
+    payload = {"queries": [meili_query]}
     resp = client.post_json(region.multi_search_url, payload, force_refresh=force_refresh)
     if resp.status_code != 200:
         return [], 0
@@ -104,18 +110,25 @@ def harvest(
     *,
     query: str | None = None,
     queries: Sequence[str] | None = None,
+    subjects: Sequence[str] | None = None,
     region: Region | None = None,
     page_size: int = 100,
     max_books: int | None = None,
     force_refresh: bool = False,
 ) -> list[BookshopBook]:
-    """Page through *all* products matching the catalogue queries.
+    """Page through *all* products in scope and merge them, de-duped by ISBN.
 
-    By default this runs every query in :data:`config.CATALOG_QUERIES` (which
-    approximate the BIC subject "Origami & paper engineering") and merges the
-    results, de-duplicating by ISBN so a book matched by more than one query
-    appears once. Stops early at ``max_books`` if given. Pass ``query`` for a
-    single ad-hoc search, or ``queries`` to override the list explicitly.
+    Scope is the union of two kinds of search, joined on ISBN so a book matched
+    more than once appears once:
+
+    * each text query in :data:`config.CATALOG_QUERIES` (default just "origami"),
+    * one **subject-filter** search over :data:`config.BOOKSHOP_SUBJECTS` — the
+      BIC/Thema codes for "Origami & paper engineering" — which broadens the
+      catalogue to paper-engineering titles that don't literally say "origami".
+
+    Stops early at ``max_books`` if given. Pass ``query`` for a single ad-hoc
+    search, or ``queries`` / ``subjects`` to override either list explicitly
+    (``subjects=()`` disables the subject pass).
     """
     region = region or config.REGION
     if queries is not None:
@@ -124,15 +137,23 @@ def harvest(
         query_list = (query,)
     else:
         query_list = config.CATALOG_QUERIES
+    if subjects is None:
+        subjects = config.BOOKSHOP_SUBJECTS
+
+    # Each search is (text query, subject codes). Text queries scope by words;
+    # the trailing search (q="") scopes purely by subject classification.
+    searches: list[tuple[str, Sequence[str] | None]] = [(q, None) for q in query_list]
+    if subjects:
+        searches.append(("", tuple(subjects)))
 
     books: list[BookshopBook] = []
     seen: set[str] = set()
-    for q in query_list:
+    for q, subj in searches:
         offset = 0
         while True:
             page, total = search_page(
                 client, q, offset=offset, limit=page_size,
-                region=region, force_refresh=force_refresh,
+                region=region, subjects=subj, force_refresh=force_refresh,
             )
             if not page:
                 break

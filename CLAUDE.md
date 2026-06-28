@@ -39,7 +39,11 @@ Bookshop.org (UK)  ──harvest──►  catalogue (SQLite)  ──enrich by I
   format). We use this instead of scraping HTML — it's structured and stable.
   - Region matters: `uk.bookshop.org` gives GBP, `bookshop.org` gives USD. See
     `Region` in `origami/config.py`. Default is UK.
-  - There are ~500–550 origami titles; we page through them all with `offset`.
+  - There are ~550 books for the text query "origami"; we page through them all
+    with `offset`. The proxy also **accepts a Meilisearch `filter`** (confirmed
+    against the live API), including `filter: subjects = <code>` on BIC/Thema
+    subject codes — so we broaden the catalogue by subject (`WFTM`/`WFT`,
+    "Origami & paper engineering"), not by fuzzy text. ~1150 books in total.
   - A separate stable redirect `…/book/<isbn13>` → product page also exists
     (ISBN-13 only; ISBN-10 404s). We don't need it now but it's documented in
     `config.Region.isbn_url`.
@@ -128,10 +132,12 @@ empty, but skill-level data only appears after enrichment (`ingest`, or the
 "Enrich more" button which does 25 at a time).
 
 ### Useful env vars (see `config.py`)
-`ORIGAMI_REGION` (uk/us), `ORIGAMI_CATALOG_QUERY` (comma-separated; default
-"origami, paper engineering" — the text terms of the BIC subject "Origami &
-paper engineering", run as separate merged searches for a broader catalogue),
-`ORIGAMI_CACHE_TTL`, `ORIGAMI_REQUEST_DELAY`, `ORIGAMI_OFFLINE`,
+`ORIGAMI_REGION` (uk/us), `ORIGAMI_CATALOG_QUERY` (comma-separated text queries;
+default just "origami" — keep it tight, Meili fuzzy-OR-matches so loose terms add
+noise), `ORIGAMI_BOOKSHOP_SUBJECTS` (comma-separated BIC/Thema subject codes;
+default "WFTM, WFT" = the subject "Origami & paper engineering", harvested as a
+server-side Meilisearch `filter` and merged in by ISBN for breadth; set empty to
+disable), `ORIGAMI_CACHE_TTL`, `ORIGAMI_REQUEST_DELAY`, `ORIGAMI_OFFLINE`,
 `ORIGAMI_DATA_DIR`.
 
 ## Testing

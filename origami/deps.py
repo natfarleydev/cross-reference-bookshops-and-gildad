@@ -21,6 +21,7 @@ from .config import Region
 class Settings:
     region: Region
     catalog_queries: tuple[str, ...]
+    bookshop_subjects: tuple[str, ...]
 
     @property
     def currency(self) -> str:
@@ -34,7 +35,11 @@ class Settings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings(region=config.REGION, catalog_queries=config.CATALOG_QUERIES)
+    return Settings(
+        region=config.REGION,
+        catalog_queries=config.CATALOG_QUERIES,
+        bookshop_subjects=config.BOOKSHOP_SUBJECTS,
+    )
 
 
 @lru_cache(maxsize=1)
