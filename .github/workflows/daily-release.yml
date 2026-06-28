@@ -20,7 +20,9 @@ concurrency:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Generous for the first cold run (harvest + ~1150 Gilad lookups + magazine
+    # image downloads). Once data/ and out/ are cached, daily runs are minutes.
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +52,18 @@ jobs:
           restore-keys: |
             origami-data-
 
+      - name: Restore magazine images
+        # The Typst magazine downloads cover + Gilad model photos into out/.
+        # Persisting out/ across runs (same rolling-key trick as data/) means each
+        # day only fetches images for *new* books — the bulk are downloaded once
+        # and reused. The downsampled derivatives in out/ are reused too.
+        uses: actions/cache@v4
+        with:
+          path: out
+          key: origami-out-${{ github.run_id }}
+          restore-keys: |
+            origami-out-
+
       - name: Lint and test
         run: |
           python -m ruff check app.py origami tests
@@ -66,6 +80,26 @@ jobs:
           ORIGAMI_REGION: uk
         run: |
           python -m origami.ingest --refresh
+
+      - name: Set up Typst
+        # Single static binary; used to lay out the illustrated magazine PDF.
+        # Pinned to a version verified to compile scripts/magazine.typ.
+        continue-on-error: true
+        uses: typst-community/setup-typst@v5
+        with:
+          typst-version: "0.15.0"
+
+      - name: Build the magazine PDF
+        # Export the enriched catalogue to JSON + images (cover/photo binaries land
+        # in out/, which is cached above), then compile the Typst magazine. Depends
+        # on the catalogue build; best-effort so a bad upstream day still ships the
+        # catalogue release.
+        continue-on-error: true
+        env:
+          ORIGAMI_REGION: uk
+        run: |
+          PYTHONPATH=. python scripts/export_magazine_data.py
+          typst compile --root . scripts/magazine.typ out/origami_magazine_typst.pdf
 
       - name: Package the catalogue
         id: package
@@ -84,6 +118,12 @@ jobs:
           fi
           echo "books=$BOOKS" >> "$GITHUB_OUTPUT"
           echo "enriched=$ENRICHED" >> "$GITHUB_OUTPUT"
+          MAGAZINE=no
+          if [ -f out/origami_magazine_typst.pdf ]; then
+            cp out/origami_magazine_typst.pdf "dist/origami-magazine-$DATE.pdf"
+            MAGAZINE=yes
+          fi
+          echo "magazine=$MAGAZINE" >> "$GITHUB_OUTPUT"
           ls -la dist || true
 
       - name: Publish release
@@ -96,10 +136,16 @@ jobs:
 
             - Books in catalogue: **${{ steps.package.outputs.books }}**
             - Enriched with Gilad skill level + diagram count: **${{ steps.package.outputs.enriched }}**
+            - Illustrated magazine PDF attached: **${{ steps.package.outputs.magazine }}**
 
-            The attached `*.sqlite.gz` is the prebuilt catalogue. Decompress it to
-            `data/catalog.sqlite` and run `python app.py` to browse without a first-run
-            harvest. (If the counts above are 0, an upstream source was unavailable for
-            this build — the next daily run will retry.)
+            Attachments:
+            - `*.sqlite.gz` — the prebuilt catalogue. Decompress it to
+              `data/catalog.sqlite` and run `python app.py` to browse without a
+              first-run harvest.
+            - `*.pdf` — the illustrated "Bookshop.org × Gilad" magazine (covers,
+              model photos, skill bands), ready to read or print.
+
+            (If the counts above are 0 or the magazine is `no`, an upstream source was
+            unavailable for this build — the next daily run will retry.)
           files: dist/*
           fail_on_unmatched_files: false

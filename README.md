@@ -59,6 +59,10 @@ Now `python app.py` serves instantly with no harvest. (Bookshop's text query for
 "origami" plus the BIC/Thema subject filter "Origami & paper engineering"
 (`WFTM`/`WFT`) gives ~1150 books.)
 
+Each daily release also attaches the **illustrated magazine PDF** (`*.pdf`, the
+Typst "Bookshop.org × Gilad" guide) — so you can read or print it without
+building it yourself.
+
 ## Export a PDF
 
 Turn the catalogue into a printable, magazine-style guide:
