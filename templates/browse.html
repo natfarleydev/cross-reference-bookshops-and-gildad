@@ -100,6 +100,8 @@
           <p class="badges">
             {% if book.difficulty.is_known %}
               <span class="badge skill-{{ (book.difficulty.buckets|list|first) if book.difficulty.buckets else 'unknown' }}">{{ book.difficulty.label }}</span>
+            {% elif book.gilad_status == 'absent' %}
+              <span class="badge skill-unknown" title="No matching record in Gilad&rsquo;s Origami Database">Not in Gilad</span>
             {% endif %}
             {% if book.design_count %}<span class="badge count">{{ book.design_count }} diagrams</span>{% endif %}
             {% if book.format_category and book.format_category != 'Other' %}<span class="badge fmt">{{ book.format_category }}</span>{% endif %}

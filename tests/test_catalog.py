@@ -16,6 +16,24 @@ def make_book(isbn="9780000000001", **kw) -> CatalogBook:
     return CatalogBook(**base)
 
 
+def test_gilad_status_states():
+    # Fresh from Bookshop: lookup not yet attempted.
+    pending = make_book()
+    assert not pending.in_gilad
+    assert pending.gilad_status == "pending"
+
+    # Enriched but Gilad has no matching record: still a valid book, just absent.
+    absent = replace(pending, enriched=True)
+    assert not absent.in_gilad
+    assert absent.gilad_status == "absent"
+
+    # Enriched with a real Gilad match.
+    found = replace(pending, enriched=True, gilad_book_id="3795",
+                    gilad_url="https://www.giladorigami.com/origami-database-book/3795")
+    assert found.in_gilad
+    assert found.gilad_status == "found"
+
+
 def test_upsert_and_get():
     cat = Catalog(":memory:")
     cat.upsert(make_book())

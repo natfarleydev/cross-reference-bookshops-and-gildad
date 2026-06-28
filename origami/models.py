@@ -111,6 +111,23 @@ class CatalogBook:
         return self.status.lower().strip() == "in stock"
 
     @property
+    def in_gilad(self) -> bool:
+        """True once a Gilad record has actually been matched for this book.
+
+        Distinct from :attr:`enriched`, which only means a lookup was *attempted*.
+        Bookshop is the source of truth, so a book with no Gilad record is still
+        shown — callers use this to label it ("not in Gilad") rather than hide it.
+        """
+        return bool(self.gilad_url or self.gilad_book_id)
+
+    @property
+    def gilad_status(self) -> str:
+        """One of ``"found"`` / ``"absent"`` / ``"pending"`` for display."""
+        if self.in_gilad:
+            return "found"
+        return "absent" if self.enriched else "pending"
+
+    @property
     def is_kids(self) -> bool:
         text = f"{self.title} {self.subtitle}"
         return bool(_KIDS_RE.search(text))

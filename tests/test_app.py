@@ -62,3 +62,16 @@ def test_book_not_found(client):
     resp = client.get("/book/0000000000000")
     assert resp.status_code == 404
     assert "not in the catalogue" in resp.text.lower()
+
+
+def test_book_without_gilad_record_is_still_shown_and_labelled(client):
+    # Kusudama Magic is enriched but has no Gilad match: it must still appear in
+    # browse, and be clearly labelled rather than silently blank.
+    resp = client.get("/")
+    assert "Kusudama Magic" in resp.text
+    assert "Not in Gilad" in resp.text
+
+    detail = client.get("/book/9782222222222")
+    assert detail.status_code == 200
+    assert "Not in Gilad" in detail.text
+    assert "diagram database" in detail.text  # explains why there's no diagram list
