@@ -35,3 +35,9 @@ Thumbs.db
 
 # Generated artifacts
 out/
+
+# ...but DO commit the seed catalogue: a catalogue enriched offline (Gilad is not
+# reachable from CI) that the daily build restores to recover skill levels.
+# Gzipped, so the *.sqlite rule above doesn't catch it; pinned here for safety.
+!seed/
+!seed/catalog.sqlite.gz

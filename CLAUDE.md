@@ -131,6 +131,30 @@ The app also lazily harvests the Bookshop catalogue on first page load if it's
 empty, but skill-level data only appears after enrichment (`ingest`, or the
 "Enrich more" button which does 25 at a time).
 
+### Daily release + the seed catalogue
+
+`.github/workflows/daily-release.yml` rebuilds the catalogue every day and
+publishes it (plus the Typst magazine PDF) as a GitHub Release.
+
+**Key constraint: GitHub-hosted runners can't reach Gilad** (it blocks/rate-limits
+datacenter IPs — a from-scratch CI build gets 0 rated books, even though Bookshop
+works fine and Gilad is reachable from a normal machine/browser). So skill levels
+can't be enriched in CI. Instead:
+
+- **`seed/catalog.sqlite.gz`** — a catalogue enriched *offline* — is committed and
+  is the source of truth for skill levels. The workflow restores it over
+  `data/catalog.sqlite`, then runs `ingest --refresh --no-enrich`: Bookshop is
+  re-harvested for fresh prices/stock/new titles, `upsert` **preserves** the
+  seed's Gilad enrichment, and the Gilad pass is skipped (it can't work in CI).
+- **Rebuild the seed locally** when you want fresher skill data (run anywhere Gilad
+  is reachable):
+  ```bash
+  python -m origami.ingest --refresh
+  gzip -c data/catalog.sqlite > seed/catalog.sqlite.gz   # then commit it
+  ```
+- `data/` and `out/` are cached across runs (`actions/cache`, rolling key) so the
+  daily build is fast; the seed is what makes skill levels survive CI.
+
 ### Useful env vars (see `config.py`)
 `ORIGAMI_REGION` (uk/us), `ORIGAMI_CATALOG_QUERY` (comma-separated text queries;
 default just "origami" — keep it tight, Meili fuzzy-OR-matches so loose terms add

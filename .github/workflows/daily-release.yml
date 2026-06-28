@@ -64,22 +64,42 @@ jobs:
           restore-keys: |
             origami-out-
 
+      - name: Seed the enriched catalogue
+        # Gilad's database is not reliably reachable from GitHub-hosted runners, so
+        # the daily build cannot enrich skill levels itself (a from-scratch CI run
+        # produces 0 rated books). seed/catalog.sqlite.gz is a catalogue enriched
+        # offline, where Gilad *is* reachable, and is the source of truth for skill
+        # levels. Always overlay it so `ingest --refresh` upserts current Bookshop
+        # data (prices/stock/new titles) on top while PRESERVING that enrichment —
+        # which is what feeds the skill filter and the skill-organised magazine.
+        # Rebuild it locally with `python -m origami.ingest --refresh` and recommit.
+        run: |
+          if [ -f seed/catalog.sqlite.gz ]; then
+            mkdir -p data
+            gzip -dc seed/catalog.sqlite.gz > data/catalog.sqlite
+            echo "Seeded data/catalog.sqlite from seed/catalog.sqlite.gz"
+          else
+            echo "No seed found; building from scratch (skill levels may be empty)."
+          fi
+
       - name: Lint and test
         run: |
           python -m ruff check app.py origami tests
           python -m pytest -q
 
-      - name: Build the catalogue (refresh Bookshop, reuse Gilad enrichment)
-        # --refresh re-harvests Bookshop for new titles / current stock & price,
-        # but upsert preserves existing enrichment and enrich_all only queries
-        # Gilad for not-yet-enriched books (and those lookups hit the cache too).
-        # Best-effort: upstream sites occasionally rate-limit or change shape, so
-        # if the build can't complete we still publish a release noting the gap.
+      - name: Build the catalogue (refresh Bookshop on top of the seed)
+        # --refresh re-harvests Bookshop for new titles / current stock & price;
+        # upsert preserves the seed's Gilad enrichment (skill level + diagram
+        # count). --no-enrich skips the live Gilad pass on purpose: Gilad isn't
+        # reachable from CI, so querying it here only wastes time and would
+        # mislabel new books as "Not in Gilad". New (non-seed) books stay "pending"
+        # until the seed is rebuilt offline. Best-effort so a flaky Bookshop day
+        # still publishes.
         continue-on-error: true
         env:
           ORIGAMI_REGION: uk
         run: |
-          python -m origami.ingest --refresh
+          python -m origami.ingest --refresh --no-enrich
 
       - name: Set up Typst
         # Single static binary; used to lay out the illustrated magazine PDF.
