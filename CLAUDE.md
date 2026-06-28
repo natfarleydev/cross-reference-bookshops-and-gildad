@@ -128,7 +128,9 @@ empty, but skill-level data only appears after enrichment (`ingest`, or the
 "Enrich more" button which does 25 at a time).
 
 ### Useful env vars (see `config.py`)
-`ORIGAMI_REGION` (uk/us), `ORIGAMI_CATALOG_QUERY` (default "origami"),
+`ORIGAMI_REGION` (uk/us), `ORIGAMI_CATALOG_QUERY` (comma-separated; default
+"origami, paper engineering" — the text terms of the BIC subject "Origami &
+paper engineering", run as separate merged searches for a broader catalogue),
 `ORIGAMI_CACHE_TTL`, `ORIGAMI_REQUEST_DELAY`, `ORIGAMI_OFFLINE`,
 `ORIGAMI_DATA_DIR`.
 

@@ -74,8 +74,23 @@ REGION = REGIONS[os.environ.get("ORIGAMI_REGION", "uk").lower()]
 
 # The Meilisearch index that holds sellable products.
 BOOKSHOP_INDEX = os.environ.get("ORIGAMI_BOOKSHOP_INDEX", "products")
-# The full-text query used to scope the catalogue to origami titles.
-CATALOG_QUERY = os.environ.get("ORIGAMI_CATALOG_QUERY", "origami")
+
+# The full-text queries used to scope the catalogue. We want the BIC subject
+# "Origami & paper engineering" (BIC/Thema code WFT), but Bookshop's public
+# instant-meilisearch proxy doesn't expose a category/BIC facet we can filter on,
+# so we approximate that subject by running its text terms as *separate* searches
+# and merging the de-duped results (``harvest`` joins on ISBN). This casts a
+# broader net than "origami" alone — it also catches kirigami / pop-up /
+# paper-engineering titles that don't literally say "origami".
+#
+# Override with a comma-separated ``ORIGAMI_CATALOG_QUERY`` (e.g. "origami").
+CATALOG_QUERIES = tuple(
+    q.strip()
+    for q in os.environ.get("ORIGAMI_CATALOG_QUERY", "origami, paper engineering").split(",")
+    if q.strip()
+) or ("origami",)
+# Backwards-compatible single-query alias (first query).
+CATALOG_QUERY = CATALOG_QUERIES[0]
 
 
 # --- Gilad -----------------------------------------------------------------

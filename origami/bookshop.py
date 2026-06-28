@@ -16,6 +16,7 @@ Prices come back as integer minor units (pence/cents); we convert to major units
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 
 from . import config
 from .cache import HttpClient
@@ -102,38 +103,48 @@ def harvest(
     client: HttpClient,
     *,
     query: str | None = None,
+    queries: Sequence[str] | None = None,
     region: Region | None = None,
     page_size: int = 100,
     max_books: int | None = None,
     force_refresh: bool = False,
 ) -> list[BookshopBook]:
-    """Page through *all* products matching ``query`` (default: origami).
+    """Page through *all* products matching the catalogue queries.
 
-    Deduplicates by ISBN and stops at ``max_books`` if given.
+    By default this runs every query in :data:`config.CATALOG_QUERIES` (which
+    approximate the BIC subject "Origami & paper engineering") and merges the
+    results, de-duplicating by ISBN so a book matched by more than one query
+    appears once. Stops early at ``max_books`` if given. Pass ``query`` for a
+    single ad-hoc search, or ``queries`` to override the list explicitly.
     """
     region = region or config.REGION
-    query = query if query is not None else config.CATALOG_QUERY
+    if queries is not None:
+        query_list: Sequence[str] = queries
+    elif query is not None:
+        query_list = (query,)
+    else:
+        query_list = config.CATALOG_QUERIES
 
     books: list[BookshopBook] = []
     seen: set[str] = set()
-    offset = 0
-    total = None
-    while True:
-        page, total = search_page(
-            client, query, offset=offset, limit=page_size,
-            region=region, force_refresh=force_refresh,
-        )
-        if not page:
-            break
-        for b in page:
-            if b.isbn13 and b.isbn13 not in seen:
-                seen.add(b.isbn13)
-                books.append(b)
-        offset += page_size
-        if max_books is not None and len(books) >= max_books:
-            return books[:max_books]
-        if offset >= total:
-            break
+    for q in query_list:
+        offset = 0
+        while True:
+            page, total = search_page(
+                client, q, offset=offset, limit=page_size,
+                region=region, force_refresh=force_refresh,
+            )
+            if not page:
+                break
+            for b in page:
+                if b.isbn13 and b.isbn13 not in seen:
+                    seen.add(b.isbn13)
+                    books.append(b)
+            offset += page_size
+            if max_books is not None and len(books) >= max_books:
+                return books[:max_books]
+            if offset >= total:
+                break
     return books
 
 

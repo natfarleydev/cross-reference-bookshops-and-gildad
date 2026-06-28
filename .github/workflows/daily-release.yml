@@ -1,0 +1,89 @@
+name: Daily catalogue release
+
+# Rebuild the Bookshop.org × Gilad catalogue once a day and publish it as a
+# GitHub Release, so a prebuilt, ready-to-browse SQLite catalogue is always
+# available to download without anyone having to run `ingest` themselves.
+
+on:
+  schedule:
+    # 05:17 UTC daily (off the top of the hour to be polite to the shared runners).
+    - cron: "17 5 * * *"
+  workflow_dispatch: {}        # allow manual "Run workflow" from the Actions tab
+
+permissions:
+  contents: write              # needed to create tags/releases
+
+concurrency:
+  group: daily-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint and test
+        run: |
+          python -m ruff check app.py origami tests
+          python -m pytest -q
+
+      - name: Build the catalogue (harvest Bookshop + enrich with Gilad)
+        # Best-effort: the upstream sites occasionally rate-limit or change shape.
+        # If the build can't complete we still publish a release noting the gap,
+        # rather than failing the whole job.
+        continue-on-error: true
+        env:
+          ORIGAMI_REGION: uk
+        run: |
+          python -m origami.ingest
+
+      - name: Package the catalogue
+        id: package
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          DATE="$(date -u +%Y-%m-%d)"
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+          if [ -f data/catalog.sqlite ]; then
+            gzip -c data/catalog.sqlite > "dist/origami-catalog-$DATE.sqlite.gz"
+            BOOKS=$(python -c "from origami.catalog import Catalog; print(Catalog().count())")
+            ENRICHED=$(python -c "from origami.catalog import Catalog; print(Catalog().enriched_count())")
+          else
+            BOOKS=0
+            ENRICHED=0
+          fi
+          echo "books=$BOOKS" >> "$GITHUB_OUTPUT"
+          echo "enriched=$ENRICHED" >> "$GITHUB_OUTPUT"
+          ls -la dist || true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: catalog-${{ steps.package.outputs.date }}
+          name: Catalogue ${{ steps.package.outputs.date }}
+          body: |
+            Automated daily build of the Bookshop.org (UK) × Gilad origami catalogue.
+
+            - Books in catalogue: **${{ steps.package.outputs.books }}**
+            - Enriched with Gilad skill level + diagram count: **${{ steps.package.outputs.enriched }}**
+
+            The attached `*.sqlite.gz` is the prebuilt catalogue. Decompress it to
+            `data/catalog.sqlite` and run `python app.py` to browse without a first-run
+            harvest. (If the counts above are 0, an upstream source was unavailable for
+            this build — the next daily run will retry.)
+          files: dist/*
+          fail_on_unmatched_files: false

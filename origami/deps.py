@@ -20,16 +20,21 @@ from .config import Region
 @dataclass(frozen=True)
 class Settings:
     region: Region
-    catalog_query: str
+    catalog_queries: tuple[str, ...]
 
     @property
     def currency(self) -> str:
         return self.region.currency
 
+    @property
+    def catalog_query(self) -> str:
+        """First catalogue query (back-compat single-value accessor)."""
+        return self.catalog_queries[0]
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings(region=config.REGION, catalog_query=config.CATALOG_QUERY)
+    return Settings(region=config.REGION, catalog_queries=config.CATALOG_QUERIES)
 
 
 @lru_cache(maxsize=1)
